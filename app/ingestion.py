@@ -1,3 +1,15 @@
+import chromadb
+from sentence_transformers import SentenceTransformer
+
+# Load embedding model once (expensive to load, so we do it at module level)
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Persistent Chroma client - saves data to disk in chroma_db/ folder
+chroma_client = chromadb.PersistentClient(path="./chroma_db")
+
+# Create (or get existing) collection - think of this like a "table" for our chunks
+collection = chroma_client.get_or_create_collection(name="ragify_docs")
+
 def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]:
     """
     Splits text into overlapping chunks based on word count.
@@ -24,3 +36,24 @@ def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]
             break
 
     return chunks
+
+def embed_chunks(chunks: list[str]) -> list[list[float]]:
+    """
+    Converts a list of text chunks into embedding vectors.
+    """
+    embeddings = embedding_model.encode(chunks)
+    return embeddings.tolist()  # Chroma expects plain lists, not numpy arrays 
+
+def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filename: str):
+    """
+    Stores chunks + their embeddings + metadata into ChromaDB.
+    """
+    ids = [f"{source_filename}_chunk_{i}" for i in range(len(chunks))]
+    metadatas = [{"source": source_filename, "chunk_index": i} for i in range(len(chunks))]
+
+    collection.add(
+        ids=ids,
+        embeddings=embeddings,
+        documents=chunks,
+        metadatas=metadatas
+    )
