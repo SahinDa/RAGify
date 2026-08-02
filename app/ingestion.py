@@ -3,6 +3,7 @@ from sentence_transformers import SentenceTransformer
 from pypdf import PdfReader
 import io
 import hashlib
+import docx
 
 # Load embedding model once (expensive to load, so we do it at module level)
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -96,6 +97,17 @@ def parse_file(filename: str, content: bytes) -> str:
         text = ""
         for page in reader.pages:
             text += page.extract_text() + "\n"
+
+        return text
+    
+    
+    elif filename.lower().endswith(".docx"):
+        docx_file = io.BytesIO(content)
+        document = docx.Document(docx_file)
+
+        text = ""
+        for paragraph in document.paragraphs:
+            text += paragraph.text + "\n"
 
         return text
 
