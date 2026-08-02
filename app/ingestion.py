@@ -2,6 +2,7 @@ import chromadb
 from sentence_transformers import SentenceTransformer
 from pypdf import PdfReader
 import io
+import hashlib
 
 # Load embedding model once (expensive to load, so we do it at module level)
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -51,17 +52,22 @@ def embed_chunks(chunks: list[str]) -> list[list[float]]:
 
 def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filename: str):
     """
-    Stores chunks + their embeddings + metadata into ChromaDB.
-    Deletes any existing chunks from the same filename first, to avoid duplicates.
+    Stores chunks + embeddings + metadata into ChromaDB.
+    - Deletes old chunks tied to this exact filename first (handles edited re-uploads,
+      so stale/removed content doesn't linger forever).
+    - Uses content-hash IDs so identical text is never duplicated,
+      even if it appears under a different filename.
     """
     
-    # Remove old chunks from this same file, if any exist (re-upload = replace, not duplicate)
+    # Step 1: clear out old chunks from this filename (in case the file was edited)
     collection.delete(where={"source": source_filename})
-        
-    ids = [f"{source_filename}_chunk_{i}" for i in range(len(chunks))]
-    metadatas = [{"source": source_filename, "chunk_index": i} for i in range(len(chunks))]
 
-    collection.add(
+    # Step 2: build content-based IDs
+    ids = [get_chunk_id(chunk) for chunk in chunks]
+    metadatas = [{"source": source_filename, "chunk_index": i} for i in range(len(chunks))]
+    
+    # Step 3: upsert - overwrites if identical content already exists under any ID
+    collection.upsert(
         ids=ids,
         embeddings=embeddings,
         documents=chunks,
@@ -96,3 +102,9 @@ def parse_file(filename: str, content: bytes) -> str:
     else:
         raise ValueError(f"Unsupported file type: {filename}")
 
+def get_chunk_id(text: str) -> str:
+    """
+    Generates a consistent, unique ID based on the chunk's text content.
+    Identical text always produces the same ID, enabling content-based deduplication.
+    """
+    return hashlib.md5(text.encode("utf-8")).hexdigest()
