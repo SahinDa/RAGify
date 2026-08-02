@@ -4,10 +4,17 @@ import requests
 
 from app.retrieval import retrieve_relevant_chunks
 from app.llm import build_prompt, call_llm
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 
 app = FastAPI(title="RAGify")
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+async def serve_frontend():
+    return FileResponse("static/index.html")
 
 @app.post("/upload")
 async def upload_file(file: UploadFile):

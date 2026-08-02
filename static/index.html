@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>RAGify</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background: #999;
+        }
+
+        #answer {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+
+        #sources {
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .status {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>RAGify</h1>
+
+    <section>
+        <h2>Upload Document</h2>
+        <input type="file" id="fileInput" accept=".txt,.pdf,.docx" />
+        <button onclick="uploadFile()">Upload</button>
+        <p id="uploadStatus"></p>
+    </section>
+
+    <section>
+        <h2>Ask a Question</h2>
+        <input type="text" id="questionInput" placeholder="Ask something about your uploaded documents..." />
+        <button onclick="askQuestion()">Ask</button>
+        <div id="answer"></div>
+        <div id="sources"></div>
+    </section>
+
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById("fileInput");
+            const statusEl = document.getElementById("uploadStatus");
+
+            if (!fileInput.files.length) {
+                statusEl.textContent = "Please select a file first.";
+                statusEl.className = "error";
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            statusEl.textContent = "Uploading...";
+            statusEl.className = "";
+
+            try {
+                const response = await fetch("/upload", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusEl.textContent = `Uploaded "${data.filename}" — ${data.chunks_created} chunks created.`;
+                    statusEl.className = "status";
+                } else {
+                    statusEl.textContent = `Error: ${data.detail}`;
+                    statusEl.className = "error";
+                }
+            } catch (err) {
+                statusEl.textContent = "Upload failed: " + err.message;
+                statusEl.className = "error";
+            }
+        }
+
+        async function askQuestion() {
+            const questionInput = document.getElementById("questionInput");
+            const answerEl = document.getElementById("answer");
+            const sourcesEl = document.getElementById("sources");
+
+            const question = questionInput.value.trim();
+            if (!question) {
+                answerEl.textContent = "Please type a question.";
+                return;
+            }
+
+            answerEl.textContent = "Thinking...";
+            sourcesEl.textContent = "";
+
+            try {
+                const response = await fetch(`/ask?question=${encodeURIComponent(question)}`, {
+                    method: "POST"
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    answerEl.textContent = data.answer;
+                    if (data.sources && data.sources.length > 0) {
+                        const uniqueSources = [...new Set(data.sources.map(s => s.source))];
+                        sourcesEl.textContent = "Sources: " + uniqueSources.join(", ");
+                    }
+                } else {
+                    answerEl.textContent = `Error: ${data.detail}`;
+                }
+            } catch (err) {
+                answerEl.textContent = "Request failed: " + err.message;
+            }
+        }
+    </script>
+</body>
+
+</html>
