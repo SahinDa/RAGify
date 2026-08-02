@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, HTTPException
 from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
+import requests
 
 from app.retrieval import retrieve_relevant_chunks
 from app.llm import build_prompt, call_llm
@@ -10,14 +11,24 @@ app = FastAPI(title="RAGify")
 
 @app.post("/upload")
 async def upload_file(file: UploadFile):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided.")
+    
     # Step 1: Read raw bytes from the uploaded file
     content = await file.read()
-
+    
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    
+    # Limit file size to 10MB to prevent server overload
+    max_size = 10 * 1024 * 1024  # 10MB
+    if len(content) > max_size:
+        raise HTTPException(status_code=413, detail="File too large. Max size is 10MB.")
     # Step 2: Parse text out of the file (handles .txt / .pdf)
     try:
         text = parse_file(file.filename, content)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+         raise HTTPException(status_code=400, detail=str(e))
 
     if not text.strip():
         raise HTTPException(status_code=400, detail="No readable text found in file.")
@@ -39,6 +50,9 @@ async def upload_file(file: UploadFile):
 
 @app.post("/ask")
 async def ask_question(question: str):
+    if not question or not question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+    
     chunks = retrieve_relevant_chunks(question)
 
     if not chunks:
@@ -49,7 +63,15 @@ async def ask_question(question: str):
         }
 
     messages = build_prompt(question, chunks)
-    answer = call_llm(messages)
+    try:
+        answer = call_llm(messages)
+    except requests.exceptions.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"LLM provider error: {str(e)}")
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="LLM provider timed out. Please try again.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error calling LLM: {str(e)}")
+
 
     return {
         "question": question,
