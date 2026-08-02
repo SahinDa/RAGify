@@ -1,6 +1,10 @@
 from fastapi import FastAPI, UploadFile, HTTPException
 from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
 
+from app.retrieval import retrieve_relevant_chunks
+from app.llm import build_prompt, call_llm
+
+
 app = FastAPI(title="RAGify")
 
 
@@ -32,3 +36,23 @@ async def upload_file(file: UploadFile):
         "chunks_created": len(chunks),
         "status": "success"
     }
+
+@app.post("/ask")
+async def ask_question(question: str):
+    chunks = retrieve_relevant_chunks(question)
+
+    if not chunks:
+        return {
+            "question": question,
+            "answer": "I don't have enough information in the provided documents to answer that.",
+            "sources": []
+        }
+
+    messages = build_prompt(question, chunks)
+    answer = call_llm(messages)
+
+    return {
+        "question": question,
+        "answer": answer,
+        "sources": [c["metadata"] for c in chunks]
+    }    
