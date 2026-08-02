@@ -10,7 +10,10 @@ embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 
 # Create (or get existing) collection - think of this like a "table" for our chunks
-collection = chroma_client.get_or_create_collection(name="ragify_docs")
+collection = chroma_client.get_or_create_collection(
+    name="ragify_docs",
+    metadata={"hnsw:space": "cosine"} 
+    )
 
 def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]:
     """
