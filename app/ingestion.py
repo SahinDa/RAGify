@@ -1,5 +1,7 @@
 import chromadb
 from sentence_transformers import SentenceTransformer
+from pypdf import PdfReader
+import io
 
 # Load embedding model once (expensive to load, so we do it at module level)
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -57,3 +59,36 @@ def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filena
         documents=chunks,
         metadatas=metadatas
     )
+    
+    
+    from pypdf import PdfReader
+import io
+
+
+def parse_file(filename: str, content: bytes) -> str:
+    """
+    Extracts plain text from uploaded file bytes, based on file extension.
+
+    Args:
+        filename: original filename (used to detect extension)
+        content: raw file bytes
+
+    Returns:
+        Extracted plain text as a string
+    """
+    if filename.lower().endswith(".txt"):
+        return content.decode("utf-8")
+
+    elif filename.lower().endswith(".pdf"):
+        pdf_file = io.BytesIO(content)  # treat bytes like a file, in memory
+        reader = PdfReader(pdf_file)
+
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+
+        return text
+
+    else:
+        raise ValueError(f"Unsupported file type: {filename}")
+
