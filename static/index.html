@@ -36,6 +36,7 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            margin-right: 10px;
         }
 
         button:disabled {
@@ -48,6 +49,7 @@
             background: #f5f5f5;
             border-radius: 5px;
             white-space: pre-wrap;
+            min-height: 20px;
         }
 
         #sources {
@@ -80,6 +82,7 @@
         <h2>Ask a Question</h2>
         <input type="text" id="questionInput" placeholder="Ask something about your uploaded documents..." />
         <button onclick="askQuestion()">Ask</button>
+        <button onclick="askQuestionStream()">Ask (Streaming)</button>
         <div id="answer"></div>
         <div id="sources"></div>
     </section>
@@ -121,6 +124,7 @@
             }
         }
 
+        // Non-streaming: waits for full answer, but includes sources
         async function askQuestion() {
             const questionInput = document.getElementById("questionInput");
             const answerEl = document.getElementById("answer");
@@ -149,6 +153,47 @@
                     }
                 } else {
                     answerEl.textContent = `Error: ${data.detail}`;
+                }
+            } catch (err) {
+                answerEl.textContent = "Request failed: " + err.message;
+            }
+        }
+
+        // Streaming: answer appears progressively, but no sources (known limitation)
+        async function askQuestionStream() {
+            const questionInput = document.getElementById("questionInput");
+            const answerEl = document.getElementById("answer");
+            const sourcesEl = document.getElementById("sources");
+
+            const question = questionInput.value.trim();
+            if (!question) {
+                answerEl.textContent = "Please type a question.";
+                return;
+            }
+
+            answerEl.textContent = "";
+            sourcesEl.textContent = "(streaming mode — sources not shown)";
+
+            try {
+                const response = await fetch(`/ask/stream?question=${encodeURIComponent(question)}`, {
+                    method: "POST"
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    answerEl.textContent = `Error: ${data.detail}`;
+                    return;
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const textChunk = decoder.decode(value, { stream: true });
+                    answerEl.textContent += textChunk;
                 }
             } catch (err) {
                 answerEl.textContent = "Request failed: " + err.message;

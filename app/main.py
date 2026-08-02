@@ -3,9 +3,10 @@ from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
 import requests
 
 from app.retrieval import retrieve_relevant_chunks
-from app.llm import build_prompt, call_llm
+from app.llm import build_prompt, call_llm_stream
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 
 
 app = FastAPI(title="RAGify")
@@ -59,7 +60,7 @@ async def upload_file(file: UploadFile):
 async def ask_question(question: str):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
-    
+
     chunks = retrieve_relevant_chunks(question)
 
     if not chunks:
@@ -70,8 +71,9 @@ async def ask_question(question: str):
         }
 
     messages = build_prompt(question, chunks)
+
     try:
-        answer = call_llm(messages)
+        answer = "".join(call_llm_stream(messages))
     except requests.exceptions.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"LLM provider error: {str(e)}")
     except requests.exceptions.Timeout:
@@ -79,9 +81,32 @@ async def ask_question(question: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error calling LLM: {str(e)}")
 
-
     return {
         "question": question,
         "answer": answer,
         "sources": [c["metadata"] for c in chunks]
-    }    
+    }
+
+
+@app.post("/ask/stream")
+async def ask_question_stream(question: str):
+    if not question or not question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    chunks = retrieve_relevant_chunks(question)
+
+    if not chunks:
+        def empty_response():
+            yield "I don't have enough information in the provided documents to answer that."
+        return StreamingResponse(empty_response(), media_type="text/plain")
+
+    messages = build_prompt(question, chunks)
+
+    def generate():
+        try:
+            for piece in call_llm_stream(messages):
+                yield piece
+        except Exception as e:
+            yield f"\n[Error: {str(e)}]"
+
+    return StreamingResponse(generate(), media_type="text/plain")    
