@@ -52,7 +52,12 @@ def embed_chunks(chunks: list[str]) -> list[list[float]]:
 def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filename: str):
     """
     Stores chunks + their embeddings + metadata into ChromaDB.
+    Deletes any existing chunks from the same filename first, to avoid duplicates.
     """
+    
+    # Remove old chunks from this same file, if any exist (re-upload = replace, not duplicate)
+    collection.delete(where={"source": source_filename})
+        
     ids = [f"{source_filename}_chunk_{i}" for i in range(len(chunks))]
     metadatas = [{"source": source_filename, "chunk_index": i} for i in range(len(chunks))]
 
@@ -63,10 +68,6 @@ def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filena
         metadatas=metadatas
     )
     
-    
-    from pypdf import PdfReader
-import io
-
 
 def parse_file(filename: str, content: bytes) -> str:
     """
