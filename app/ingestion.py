@@ -110,7 +110,7 @@ def parse_file(filename: str, content: bytes) -> str:
         return content.decode("utf-8")
 
     elif filename.lower().endswith(".pdf"):
-        pdf_file = io.BytesIO(content)  # treat bytes like a file, in memory
+        pdf_file = io.BytesIO(content)
         reader = PdfReader(pdf_file)
 
         text = ""
@@ -118,21 +118,36 @@ def parse_file(filename: str, content: bytes) -> str:
             text += page.extract_text() + "\n"
 
         return text
-    
-    
+
     elif filename.lower().endswith(".docx"):
         docx_file = io.BytesIO(content)
         document = docx.Document(docx_file)
 
         text = ""
-        for paragraph in document.paragraphs:
-            text += paragraph.text + "\n"
+
+        # Walk paragraphs and tables in document order
+        for element in document.element.body:
+            if element.tag.endswith("}p"):
+                para = docx.text.paragraph.Paragraph(element, document)
+                if para.text.strip():
+                    text += para.text + "\n"
+
+            elif element.tag.endswith("}tbl"):
+                table = docx.table.Table(element, document)
+                text += "\n[TABLE]\n"
+
+                for row in table.rows:
+                    row_text = " | ".join(
+                        cell.text.strip() for cell in row.cells
+                    )
+                    text += row_text + "\n"
+
+                text += "[/TABLE]\n"
 
         return text
 
     else:
         raise ValueError(f"Unsupported file type: {filename}")
-
 def get_chunk_id(text: str) -> str:
     """
     Generates a consistent, unique ID based on the chunk's text content.
