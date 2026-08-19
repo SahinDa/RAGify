@@ -4,6 +4,7 @@ from pypdf import PdfReader
 import io
 import hashlib
 import docx
+import re
 
 # Load embedding model once (expensive to load, so we do it at module level)
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -17,33 +18,48 @@ collection = chroma_client.get_or_create_collection(
     metadata={"hnsw:space": "cosine"} 
     )
 
+
+
 def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]:
     """
-    Splits text into overlapping chunks based on word count.
-
-    Args:
-        text: The full document text
-        chunk_size: Number of words per chunk
-        overlap: Number of words to overlap between consecutive chunks
-
-    Returns:
-        List of text chunks
+    Splits text into overlapping chunks, breaking at sentence boundaries
+    instead of cutting mid-sentence. chunk_size/overlap are in words.
     """
     if overlap >= chunk_size:
         raise ValueError("overlap must be smaller than chunk_size")
-        
-    words = text.split()
+
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+
     chunks = []
-    step = chunk_size - overlap
+    current_chunk_sentences = []
+    current_word_count = 0
 
-    for i in range(0, len(words), step):
-        chunk_words = words[i:i + chunk_size]
-        chunk = " ".join(chunk_words)
-        chunks.append(chunk)
+    for sentence in sentences:
+        sentence_word_count = len(sentence.split())
 
-        # Stop if this chunk reached the end of the document
-        if i + chunk_size >= len(words):
-            break
+        if current_word_count + sentence_word_count > chunk_size and current_chunk_sentences:
+            # finalize current chunk
+            chunks.append(" ".join(current_chunk_sentences))
+
+            # build overlap: carry the last few sentences forward
+            overlap_sentences = []
+            overlap_word_count = 0
+            for s in reversed(current_chunk_sentences):
+                w = len(s.split())
+                if overlap_word_count + w > overlap:
+                    break
+                overlap_sentences.insert(0, s)
+                overlap_word_count += w
+
+            current_chunk_sentences = overlap_sentences
+            current_word_count = overlap_word_count
+
+        # this MUST be inside the outer loop — runs for every sentence
+        current_chunk_sentences.append(sentence)
+        current_word_count += sentence_word_count
+
+    if current_chunk_sentences:
+        chunks.append(" ".join(current_chunk_sentences))
 
     return chunks
 
