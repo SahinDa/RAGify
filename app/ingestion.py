@@ -65,9 +65,10 @@ def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]
 
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
     """
-    Converts a list of text chunks into embedding vectors.
+    Converts a list of text chunks into normalized embedding vectors (L2 norm = 1.0).
+    Ensures calibrated cosine distance calculations in ChromaDB.
     """
-    embeddings = embedding_model.encode(chunks)
+    embeddings = embedding_model.encode(chunks,normalize_embeddings=True)
     return embeddings.tolist()  # Chroma expects plain lists, not numpy arrays 
 
 def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filename: str):

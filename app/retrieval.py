@@ -9,7 +9,7 @@ def retrieve_relevant_chunks(question: str, top_k: int = 3, similarity_threshold
     Returns:
         List of dicts: [{"text": ..., "score": ..., "metadata": ...}, ...]
     """
-    question_embedding = embedding_model.encode([question]).tolist()
+    question_embedding = embedding_model.encode([question],normalize_embeddings=True).tolist()
 
     results = collection.query(
         query_embeddings=question_embedding,
