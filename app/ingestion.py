@@ -82,9 +82,12 @@ def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filena
     # Step 1: clear out old chunks from this filename (in case the file was edited)
     collection.delete(where={"source": source_filename})
 
-    # Step 2: build content-based IDs
-    ids = [get_chunk_id(chunk) for chunk in chunks]
-    metadatas = [{"source": source_filename, "chunk_index": i} for i in range(len(chunks))]
+    # 2. Generate collision-safe compound IDs
+    ids = [get_chunk_id(source_filename, i, chunk) for i, chunk in enumerate(chunks)]
+    metadatas = [
+        {"source": source_filename, "chunk_index": i, "char_length": len(chunks[i])}
+        for i in range(len(chunks))
+    ]
     
     # Step 3: upsert - overwrites if identical content already exists under any ID
     collection.upsert(
@@ -148,9 +151,10 @@ def parse_file(filename: str, content: bytes) -> str:
 
     else:
         raise ValueError(f"Unsupported file type: {filename}")
-def get_chunk_id(text: str) -> str:
+def get_chunk_id(source_filename: str, chunk_index: int,text: str) -> str:
     """
-    Generates a consistent, unique ID based on the chunk's text content.
-    Identical text always produces the same ID, enabling content-based deduplication.
+    Generates a unique, deterministic ID tied to the file, chunk index, and content hash.
+    Prevents identical text across different documents from overwriting each other.
     """
-    return hashlib.md5(text.encode("utf-8")).hexdigest()
+    content_hash = hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
+    return f"{source_filename}#chunk_{chunk_index}_{content_hash}"
