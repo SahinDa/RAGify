@@ -1,0 +1,7 @@
+.env
+.venv/
+venv/
+__pycache__/
+.git/
+.vscode/
+chroma_db/
