@@ -10,7 +10,7 @@ NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 
 
 def build_prompt(question: str, chunks: list[dict]) -> list[dict]:
-    """
+    """         
     Builds the messages list for the LLM, injecting retrieved chunks as context.
     """
     context_text = "\n\n".join([f"[Chunk {i+1}]: {c['text']}" for i, c in enumerate(chunks)])
@@ -31,14 +31,15 @@ def build_prompt(question: str, chunks: list[dict]) -> list[dict]:
     ]
 
 
-def call_llm_stream(messages: list[dict], model: str = "meta/llama-3.1-8b-instruct"):
+def call_llm_stream(messages: list[dict], model: str = "meta/llama-3.2-11b-vision-instruct",stream:bool =True):
     """
     Streams the LLM's response piece by piece instead of waiting for the full answer.
     Yields text chunks as they arrive.
     """
     headers = {
         "Authorization": f"Bearer {NVIDIA_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream" if stream else "application/json",
     }
 
     payload = {
@@ -46,10 +47,10 @@ def call_llm_stream(messages: list[dict], model: str = "meta/llama-3.1-8b-instru
         "messages": messages,
         "max_tokens": 512,
         "temperature": 0.2,
-        "stream": True
+        "stream": stream,
     }
 
-    with requests.post(NVIDIA_URL, headers=headers, json=payload, stream=True, timeout=30) as response:
+    with requests.post(NVIDIA_URL, headers=headers, json=payload, stream=stream, timeout=30) as response:
         response.raise_for_status()
 
         for line in response.iter_lines():
