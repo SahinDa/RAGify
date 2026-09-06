@@ -36,6 +36,10 @@ def call_llm_stream(messages: list[dict], model: str = "meta/llama-3.2-11b-visio
     Streams the LLM's response piece by piece instead of waiting for the full answer.
     Yields text chunks as they arrive.
     """
+    if not NVIDIA_API_KEY :
+        raise RuntimeError("NVIDIA API key is missing. "
+                           "Please set NVIDIA_API_KEY in your .env file."
+                           )
     headers = {
         "Authorization": f"Bearer {NVIDIA_API_KEY}",
         "Content-Type": "application/json",
