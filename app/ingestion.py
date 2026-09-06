@@ -1,16 +1,27 @@
 import chromadb
+import os
 from sentence_transformers import SentenceTransformer
 from pypdf import PdfReader
 import io
 import hashlib
 import docx
 import re
+from dotenv import load_dotenv
 
+load_dotenv()
 # Load embedding model once (expensive to load, so we do it at module level)
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
+#Local Chromadb Setup
 # Persistent Chroma client - saves data to disk in chroma_db/ folder
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
+# chroma_client = chromadb.PersistentClient(path="./chroma_db")
+
+#Remote Chromadb Setup
+chroma_client = chromadb.CloudClient(
+    api_key=os.getenv("CHROMA_API_KEY"),
+    tenant=os.getenv("CHROMA_TENANT"),
+    database=os.getenv("CHROMA_DATABASE")
+)
 
 # Create (or get existing) collection - think of this like a "table" for our chunks
 collection = chroma_client.get_or_create_collection(
