@@ -7,6 +7,7 @@ from app.llm import build_prompt, call_llm_stream
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.responses import StreamingResponse
+from fastapi.concurrency import run_in_threadpool
 
 
 app = FastAPI(title="RAGify")
@@ -45,10 +46,10 @@ async def upload_file(file: UploadFile):
     chunks = chunk_text(text)
 
     # Step 4: Embed the chunks
-    embeddings = embed_chunks(chunks)
+    embeddings =  await run_in_threadpool(embed_chunks,chunks)
 
     # Step 5: Store chunks + embeddings in ChromaDB
-    store_chunks(chunks, embeddings, source_filename=file.filename)
+    await run_in_threadpool(store_chunks,chunks, embeddings, source_filename=file.filename)
 
     return {
         "filename": file.filename,
@@ -61,7 +62,7 @@ async def ask_question(question: str):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
-    chunks = retrieve_relevant_chunks(question)
+    chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
 
     if not chunks:
         return {
@@ -73,7 +74,7 @@ async def ask_question(question: str):
     messages = build_prompt(question, chunks)
 
     try:
-        answer = "".join(call_llm_stream(messages))
+        answer = await run_in_threadpool(lambda: "".join(call_llm_stream(messages)))
     except requests.exceptions.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"LLM provider error: {str(e)}")
     except requests.exceptions.Timeout:
@@ -93,7 +94,7 @@ async def ask_question_stream(question: str):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
-    chunks = retrieve_relevant_chunks(question)
+    chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
 
     if not chunks:
         def empty_response():
@@ -102,9 +103,9 @@ async def ask_question_stream(question: str):
 
     messages = build_prompt(question, chunks)
 
-    def generate():
+    async def generate():
         try:
-            for piece in call_llm_stream(messages):
+             async for piece in call_llm_stream(messages):
                 yield piece
         except Exception as e:
             yield f"\n[Error: {str(e)}]"
