@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, HTTPException
 from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
-import requests
+import httpx
 
 from app.retrieval import retrieve_relevant_chunks
 from app.llm import build_prompt, call_llm_stream
@@ -74,10 +74,11 @@ async def ask_question(question: str):
     messages = build_prompt(question, chunks)
 
     try:
-        answer = await run_in_threadpool(lambda: "".join(call_llm_stream(messages)))
-    except requests.exceptions.HTTPError as e:
+        pieces = [piece async for piece in call_llm_stream(messages)]
+        answer = "".join(pieces)
+    except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=502, detail=f"LLM provider error: {str(e)}")
-    except requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="LLM provider timed out. Please try again.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error calling LLM: {str(e)}")
