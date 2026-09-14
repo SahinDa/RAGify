@@ -106,7 +106,7 @@ async def ask_question_stream(question: str):
 
     async def generate():
         try:
-             async for piece in call_llm_stream(messages):
+            async for piece in call_llm_stream(messages):
                 yield piece
         except Exception as e:
             yield f"\n[Error: {str(e)}]"
