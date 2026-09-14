@@ -1,0 +1,62 @@
+[
+    {
+      "question": "What is the Transformer architecture based on?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "attention"
+    },
+    {
+      "question": "Does the Transformer use recurrence or convolutions?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "without recurrence and convolutions"
+    },
+    {
+      "question": "What are the two sub-layers in each encoder layer?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "multi-head self-attention"
+    },
+    {
+      "question": "How many layers are in the encoder stack?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "6 identical layers"
+    },
+    {
+      "question": "What is the dimensionality of the model, d_model, used in the base Transformer?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "512"
+    },
+    {
+      "question": "How many attention heads are used in the multi-head attention mechanism?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "8"
+    },
+    {
+      "question": "What type of positional encoding does the Transformer use?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "sine and cosine"
+    },
+    {
+      "question": "What optimizer was used to train the Transformer?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "Adam"
+    },
+    {
+      "question": "What regularization technique is applied during training, aside from dropout?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "label smoothing"
+    },
+    {
+      "question": "On which two machine translation tasks was the Transformer evaluated?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "English-to-German"
+    },
+    {
+      "question": "What is the formula used to compute scaled dot-product attention?",
+      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
+      "expected_keyword": "softmax"
+    },
+    {
+      "question": "What is the capital of France?",
+      "expected_source": "NO_ANSWER_EXPECTED",
+      "expected_keyword": "NONE"
+    }
+  ]
