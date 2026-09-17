@@ -59,3 +59,24 @@ def retrieve_relevant_chunks(
     candidates.sort(key=lambda c: c["score"], reverse=True)    
 
     return candidates[:top_k]
+
+
+def reciprocal_rank_fusion(vector_ids: list[str], keyword_ids: list[str], k: int = 60) -> list[str]:
+    """
+    Merges two ranked ID lists (vector search results, keyword search results)
+    into one fused ranking using Reciprocal Rank Fusion.
+
+    Formula: for each list, a chunk at rank position `r` (0-indexed) contributes
+    a score of 1 / (k + r + 1). Scores are summed across both lists, so a chunk
+    that ranks well in BOTH lists ends up highest overall.
+    """
+    scores = {}
+
+    for rank, chunk_id in enumerate(vector_ids):
+        scores[chunk_id] = scores.get(chunk_id,0) + 1 / (k + rank + 1)
+
+    for rank, chunk_id in enumerate(keyword_ids):
+        scores[chunk_id] = scores.get(chunk_id,0) + 1 / (k + rank + 1)
+
+    fused = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return [chunk_id for chunk_id, score in fused]    
