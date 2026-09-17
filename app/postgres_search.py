@@ -17,8 +17,20 @@ async def get_pool():
     if _pool is None:
         _pool = await asyncpg.create_pool(DATABASE_URL)
 
-    return _pool    
+    return _pool
 
+
+async def index_chunks(chunks: list[str], ids: list[str], source_filename: str):
+    """
+    Inserts chunks into Postgres for full-text search.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM chunks WHERE source = $1", source_filename)
+        await conn.executemany(
+            "INSERT INTO chunks (id,text,source) VALUES ($1, $2, $3)",
+            [(cid, text, source_filename) for cid, text in zip(ids,chunks)]
+        )
 
 
 
