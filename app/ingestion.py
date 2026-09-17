@@ -6,6 +6,8 @@ import io
 import hashlib
 import docx
 import re
+from app.postgres_search import index_chunks
+import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -108,6 +110,8 @@ def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filena
         documents=chunks,
         metadatas=metadatas
     )
+
+    asyncio.run(index_chunks(chunks,ids,source_filename))
     
 
 def parse_file(filename: str, content: bytes) -> str:
