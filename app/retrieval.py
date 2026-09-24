@@ -51,7 +51,11 @@ def retrieve_relevant_chunks(
     # Stage 2: Keyword search (Postgres)
     keyword_ids = asyncio.run(keyword_search(question,top_k=candidate_k))
 
-    missing_ids = [cid for cid in keyword_ids if cid not in chunk_lookup]
+    missing_ids = []
+    for cid in keyword_ids:
+        if cid not in chunk_lookup:
+            missing_ids.append(cid)
+            
     if missing_ids:
         fetched = collection.get(ids=missing_ids,include=["documents","metadatas"])
         for cid, doc, meta in zip(fetched["ids"], fetched["documents"], fetched["metadatas"]):
@@ -65,8 +69,13 @@ def retrieve_relevant_chunks(
 
 
     # Stage 4: Cross-encoder re-rank
-    candidates = [chunk_lookup[cid] for cid in fused_ids if cid in chunk_lookup] 
-    pairs = [[question , c["text"]] for c in candidates]
+    candidates = []
+    for cid in fused_ids:
+        if cid in chunk_lookup:
+            candidates.append(chunk_lookup[cid]) 
+    pairs = []
+    for c in candidates:
+        pairs.append([question,c["text"]])
     rerank_scores = reranker.predict(pairs)
 
     for c , score in zip(candidates, rerank_scores):
