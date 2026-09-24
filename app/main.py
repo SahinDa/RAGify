@@ -8,10 +8,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
+from app.logging_config import setup_logging
 
 
 app = FastAPI(title="RAGify")
 
+setup_logging()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
