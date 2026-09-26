@@ -49,7 +49,7 @@ async def keyword_search(question: str,top_k: int = 20) -> list[str]:
             WHERE search_vector @@ plainto_tsquery('english', $1)
             ORDER BY rank DESC
             LIMIT $2
-            """
+            """,
             question, top_k
         )
 
