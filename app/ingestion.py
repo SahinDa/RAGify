@@ -31,12 +31,38 @@ collection = chroma_client.get_or_create_collection(
     metadata={"hnsw:space": "cosine"} 
     )
 
+SECTION_PATTERN = re.compile(r'(\d+\.\d+\s+[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,4})\n')
 
-
-def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]:
+def detect_sections(text: str) -> list[str]:
     """
-    Splits text into overlapping chunks, breaking at sentence boundaries
-    instead of cutting mid-sentence. chunk_size/overlap are in words.
+    Splits text into sections at detected numbered headers (e.g. "5.3 Optimizer").
+    Each returned section includes its own header at the start.
+    If no headers are found, returns the whole text as a single section.
+    """
+    matches = list(SECTION_PATTERN.finditer(text))
+
+    if not matches:
+        return [text]
+
+    sections = []
+    start = 0
+    for match in matches:
+        header_start = match.start()
+        if header_start > start:
+            sections.append(text[start:header_start])
+        start = header_start
+
+    sections.append(text[start:])
+
+    return [s for s in sections if s.strip()]
+
+
+def _chunk_section(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]:
+    """
+    Splits a single section of text into overlapping chunks, breaking at sentence
+    boundaries instead of cutting mid-sentence. chunk_size/overlap are in words.
+    (This is your original chunk_text logic, unchanged, now operating on one
+    section at a time instead of the whole document.)
     """
     if overlap >= chunk_size:
         raise ValueError("overlap must be smaller than chunk_size")
@@ -51,10 +77,8 @@ def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]
         sentence_word_count = len(sentence.split())
 
         if current_word_count + sentence_word_count > chunk_size and current_chunk_sentences:
-            # finalize current chunk
             chunks.append(" ".join(current_chunk_sentences))
 
-            # build overlap: carry the last few sentences forward
             overlap_sentences = []
             overlap_word_count = 0
             for s in reversed(current_chunk_sentences):
@@ -67,7 +91,6 @@ def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]
             current_chunk_sentences = overlap_sentences
             current_word_count = overlap_word_count
 
-        # this MUST be inside the outer loop — runs for every sentence
         current_chunk_sentences.append(sentence)
         current_word_count += sentence_word_count
 
@@ -75,6 +98,23 @@ def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]
         chunks.append(" ".join(current_chunk_sentences))
 
     return chunks
+
+
+def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]:
+      """
+      Splits text into overlapping chunks. First detects structural section
+      boundaries (numbered headers like "5.3 Optimizer") so a chunk never spans
+      two unrelated subsections. Within each section, applies word-count +
+      sentence-boundary chunking as before. Falls back to whole-document
+      chunking if no section headers are detected.
+      """
+      sections = detect_sections(text)
+  
+      all_chunks = []
+      for section in sections:
+          all_chunks.extend(_chunk_section(section, chunk_size, overlap))
+  
+      return all_chunks
 
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
     """
