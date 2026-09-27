@@ -7,7 +7,7 @@
     {
       "question": "Does the Transformer use recurrence or convolutions?",
       "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "dispensing with recurrence and convolutions"
+      "expected_keyword": "eschewing recurrence"
     },
     {
       "question": "What are the two sub-layers in each encoder layer?",
