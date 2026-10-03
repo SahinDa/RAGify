@@ -1,30 +1,32 @@
 # RAGify
 
-A Retrieval-Augmented Generation (RAG) system built from scratch to learn how RAG pipelines work end-to-end — file upload → embedding → vector storage → retrieval → LLM answer generation, restricted strictly to the uploaded context.
+A Retrieval-Augmented Generation (RAG) system built from scratch to learn how RAG pipelines work end-to-end — file upload → embedding → hybrid retrieval → re-ranking → LLM answer generation, restricted strictly to the uploaded context.
 
-Built with **Python**, **FastAPI**, **ChromaDB**, **sentence-transformers**, and **NVIDIA NIM (build.nvidia.com)** free-tier LLMs.
+Built with **Python**, **FastAPI**, **ChromaDB**, **Postgres (Neon)**, **sentence-transformers**, and **NVIDIA NIM (build.nvidia.com)** free-tier LLMs.
 
 ---
 
 ## Goal
 
-- Upload a document → chunk it → embed it → store in a vector database
-- Ask a question → retrieve the most relevant chunks → send to an LLM
+- Upload a document → chunk it (structure-aware) → embed it → store in a vector database + full-text search database
+- Ask a question → retrieve relevant chunks via hybrid search (semantic + keyword) → re-rank → send to an LLM
 - LLM answers **only** using the retrieved context (no hallucination / no going out-of-context)
 
 ---
 
 ## Tech Stack
 
-| Component | Choice | Why |
-|---|---|---|
-| Backend framework | FastAPI | Async, fast, easy to build APIs |
-| Vector DB | ChromaDB (PersistentClient, cosine similarity) | Local, zero-setup, great for learning |
-| Embedding model | `sentence-transformers` (`all-MiniLM-L6-v2`), local | No rate limits, free, fast for bulk chunking |
-| LLM | NVIDIA NIM — `meta/llama-3.1-8b-instruct` (dev) | Free tier, fast enough for iteration; swap to `meta/llama-3.1-70b-instruct` for quality |
-| File parsing | `pypdf` (.pdf), `python-docx` (.docx), built-in decode (.txt) | Lightweight, sufficient for text-based documents |
-| Frontend | Plain HTML/JS, served via FastAPI StaticFiles | Kept focus on RAG pipeline, not frontend tooling |
-| Env management | `venv` | Simple, standard |
+| Component         | Choice                                                          | Why                                                                                      |
+| ----------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Backend framework | FastAPI (fully async)                                           | Async, fast, easy to build APIs                                                          |
+| Vector DB         | ChromaDB Cloud, cosine similarity                               | Managed, zero local infra                                                                |
+| Keyword search DB | PostgreSQL (Neon, serverless free tier)                         | Full-text search (`tsvector`/`tsquery`) for exact-term matches vector search misses      |
+| Embedding model   | `sentence-transformers` (`all-MiniLM-L6-v2`), local, normalized | No rate limits, free, fast for bulk chunking                                             |
+| Re-ranker         | `cross-encoder/ms-marco-MiniLM-L-6-v2`                          | Scores (question, chunk) pairs jointly for higher precision than cosine similarity alone |
+| LLM               | NVIDIA NIM — `meta/llama-3.2-11b-vision-instruct`               | Free tier; swapped from 3.1-8b after reliability issues                                  |
+| File parsing      | `pypdf` (.pdf), `python-docx` (.docx), built-in decode (.txt)   | Lightweight, sufficient for text-based documents                                         |
+| Frontend          | Plain HTML/JS, served via FastAPI StaticFiles                   | Kept focus on RAG pipeline, not frontend tooling                                         |
+| Env management    | `venv`                                                          | Simple, standard                                                                         |
 
 ---
 
@@ -62,11 +64,13 @@ Same retrieval + prompt steps, but the LLM's response is streamed token-by-token
 ## Progress Tracker
 
 ### Phase 1 — Core Concepts ✅
+
 - [x] Embeddings (text → meaning as vectors, semantic similarity)
 - [x] Chunking (why size + overlap matter)
 - [x] Vector databases (why not a normal DB, why store text + vector together)
 
 ### Phase 2 — Environment Setup ✅
+
 - [x] Python venv created
 - [x] NVIDIA NIM API key generated
 - [x] Install dependencies
@@ -74,6 +78,7 @@ Same retrieval + prompt steps, but the LLM's response is streamed token-by-token
 - [x] Create folder structure
 
 ### Phase 3 — Ingestion Pipeline ✅
+
 - [x] File upload endpoint (`/upload`)
 - [x] Parse file (.txt / .pdf / .docx)
 - [x] Chunking function (word-based, size + overlap configurable)
@@ -81,6 +86,7 @@ Same retrieval + prompt steps, but the LLM's response is streamed token-by-token
 - [x] Store chunks + embeddings + metadata in Chroma
 
 ### Phase 4 — Query Pipeline ✅
+
 - [x] `/ask` endpoint
 - [x] Embed incoming question
 - [x] Retrieve top-k chunks from Chroma
@@ -88,11 +94,13 @@ Same retrieval + prompt steps, but the LLM's response is streamed token-by-token
 - [x] Call NVIDIA LLM, return answer
 
 ### Phase 5 — Guardrails ✅
+
 - [x] System prompt to restrict answers to context only
 - [x] Similarity score threshold → "I don't know" fallback when nothing relevant is retrieved
 - [x] Input validation / error handling
 
 ### Phase 6 — Polish / Extend 🔄
+
 - [x] .docx file support
 - [x] Content-hash + filename-based deduplication
 - [x] Minimal frontend for testing (upload + ask)
@@ -151,4 +159,3 @@ uvicorn app.main:app --reload
 - `python -m pip` / `python -m module` avoids Windows venv PATH mismatches between `python` and `pip` binaries.
 - Running a script directly (`python app/file.py`) vs as a module (`python -m app.file`) changes what's on Python's import path — matters once files start importing from each other.
 - Generators (`yield`) don't run until iterated — the same generator function can power both a "wait for everything" flow (`"".join()`) and a "forward pieces immediately" flow (`StreamingResponse`).
-
