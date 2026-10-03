@@ -70,12 +70,17 @@ async def upload_file(file: UploadFile):
 async def ask_question(question: str):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
+    
+    logger.info(f"Question received: {question}")
+    
     try:
         chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
     except Exception as e:
+        logger.error(f"Retrieval failed for question '{question}': {e}")
         raise HTTPException(status_code=500,detail=f"Error retrieving relevant chunks: {str(e)}")    
 
     if not chunks:
+        logger.info(f"No chunks found for question: {question}")
         return {
             "question": question,
             "answer": "I don't have enough information in the provided documents to answer that.",
@@ -88,11 +93,16 @@ async def ask_question(question: str):
         pieces = [piece async for piece in call_llm_stream(messages)]
         answer = "".join(pieces)
     except httpx.HTTPStatusError as e:
+        logger.error(f"LLM provider error for question '{question}': {e}")
         raise HTTPException(status_code=502, detail=f"LLM provider error: {str(e)}")
     except httpx.TimeoutException:
+        logger.error(f"LLM provider timed out for question: {question}")
         raise HTTPException(status_code=504, detail="LLM provider timed out. Please try again.")
     except Exception as e:
+        logger.error(f"Unexpected LLM error for question '{question}': {e}")
         raise HTTPException(status_code=500, detail=f"Unexpected error calling LLM: {str(e)}")
+    
+    logger.info(f"Answered question (answer length: {len(answer)} chars, {len(chunks)} sources)")
 
     return {
         "question": question,
