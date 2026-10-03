@@ -35,14 +35,18 @@ Built with **Python**, **FastAPI**, **ChromaDB**, **Postgres (Neon)**, **sentenc
 ```
 RAGify/
 ├── app/
-│   ├── main.py          # FastAPI app entrypoint — /upload, /ask, /ask/stream, frontend route
-│   ├── ingestion.py      # File parsing + chunking + embedding + storing + dedup
-│   ├── retrieval.py      # Query embedding + top-k retrieval + similarity threshold filtering
-│   └── llm.py            # NVIDIA NIM API call (streaming), prompt construction
+│ ├── main.py # FastAPI app entrypoint — /upload, /ask, /ask/stream, frontend route
+│ ├── ingestion.py # File parsing + structure-aware chunking + embedding + storing + dedup
+│ ├── retrieval.py # Hybrid retrieval: vector + keyword search, RRF fusion, cross-encoder re-rank
+│ ├── postgres_search.py # Postgres full-text search (index + keyword search)
+│ └── llm.py # NVIDIA NIM API call (async streaming via httpx), prompt construction
 ├── static/
-│   └── index.html        # Browser frontend (upload + ask + ask-streaming)
-├── chroma_db/             # Local Chroma persistent storage (gitignored)
-├── .env                   # API keys (NEVER commit this)
+│ └── index.html # Browser frontend (upload + ask + ask-streaming)
+├── eval/
+│ ├── eval_set.json # Regression test questions against the Attention Is All You Need paper
+│ └── run_eval.py # Runs retrieval against eval_set.json, reports accuracy
+├── tests/ # Manual verification scripts (Postgres connection, RRF logic, pipeline stages)
+├── .env # API keys + DB connection strings (NEVER commit this)
 ├── .gitignore
 ├── requirements.txt
 └── README.md
