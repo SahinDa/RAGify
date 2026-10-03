@@ -63,8 +63,10 @@ async def upload_file(file: UploadFile):
 async def ask_question(question: str):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
-
-    chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
+    try:
+        chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
+    except Exception as e:
+        raise HTTPException(status_code=500,detail=f"Error retrieving relevant chunks: {str(e)}")    
 
     if not chunks:
         return {
@@ -96,8 +98,10 @@ async def ask_question(question: str):
 async def ask_question_stream(question: str):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
-
-    chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
+    try:
+        chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving relevant chunks: {str(e)}")    
 
     if not chunks:
         def empty_response():
