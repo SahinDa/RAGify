@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, HTTPException
 from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
 import httpx
-
+import logging
 from app.retrieval import retrieve_relevant_chunks
 from app.llm import build_prompt, call_llm_stream
 from fastapi.staticfiles import StaticFiles
@@ -14,6 +14,7 @@ from app.logging_config import setup_logging
 app = FastAPI(title="RAGify")
 
 setup_logging()
+logger = logging.getLogger(__name__)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
@@ -27,6 +28,7 @@ async def upload_file(file: UploadFile):
     
     # Step 1: Read raw bytes from the uploaded file
     content = await file.read()
+    logger.info(f"Upload received: {file.filename} ({len(content)} bytes)")
     
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
@@ -34,14 +36,17 @@ async def upload_file(file: UploadFile):
     # Limit file size to 10MB to prevent server overload
     max_size = 10 * 1024 * 1024  # 10MB
     if len(content) > max_size:
+        logger.warning(f"Upload rejected (too large): {file.filename} ({len(content)} bytes)")
         raise HTTPException(status_code=413, detail="File too large. Max size is 10MB.")
     # Step 2: Parse text out of the file (handles .txt / .pdf)
     try:
         text = parse_file(file.filename, content)
     except ValueError as e:
+         logger.error(f"Parse failed for {file.filename}: {e}")
          raise HTTPException(status_code=400, detail=str(e))
 
     if not text.strip():
+        logger.warning(f"No readable text extracted from {file.filename}")
         raise HTTPException(status_code=400, detail="No readable text found in file.")
 
     # Step 3: Chunk the text
@@ -52,7 +57,9 @@ async def upload_file(file: UploadFile):
 
     # Step 5: Store chunks + embeddings in ChromaDB
     await run_in_threadpool(store_chunks,chunks, embeddings, source_filename=file.filename)
-
+    
+    logger.info(f"Upload complete: {file.filename} — {len(chunks)} chunks created")
+    
     return {
         "filename": file.filename,
         "chunks_created": len(chunks),
