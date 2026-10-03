@@ -2,6 +2,8 @@ import asyncio
 from app.ingestion import embedding_model, collection
 from app.postgres_search import keyword_search
 from sentence_transformers import CrossEncoder
+import logging
+logger = logging.getLogger(__name__)
 
 # Load once at module level — same pattern as embedding_model, avoids reload per request
 reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
@@ -25,6 +27,8 @@ def retrieve_relevant_chunks(
         List of dicts: [{"text": ..., "score": ..., "metadata": ...}, ...]
         `score` here is the cross-encoder relevance score, not cosine similarity.
     """
+    logger.info(f"Retrieving for question: {question}")
+    
     # Stage 1: Vector Search 
     question_embedding = embedding_model.encode([question],normalize_embeddings=True).tolist()
 
@@ -47,6 +51,7 @@ def retrieve_relevant_chunks(
         if similarity >= similarity_threshold:
             filtered_vector_ids.append(chunk_id)
 
+    logger.info(f"Vector search: {len(filtered_vector_ids)}/{candidate_k} passed threshold")
     
     # Stage 2: Keyword search (Postgres)
     keyword_ids = asyncio.run(keyword_search(question,top_k=candidate_k))
@@ -60,6 +65,8 @@ def retrieve_relevant_chunks(
         fetched = collection.get(ids=missing_ids,include=["documents","metadatas"])
         for cid, doc, meta in zip(fetched["ids"], fetched["documents"], fetched["metadatas"]):
             chunk_lookup[cid] = {"text": doc, "metadata": meta}
+    
+    logger.info(f"Keyword search: {len(keyword_ids)} results")        
 
     # Stage 3: Merge rankings via RRF
     fused_ids = reciprocal_rank_fusion(filtered_vector_ids,keyword_ids)
@@ -67,7 +74,8 @@ def retrieve_relevant_chunks(
     if not fused_ids:
         return []
 
-
+    logger.info(f"Fused candidates: {len(fused_ids)}")
+    
     # Stage 4: Cross-encoder re-rank
     candidates = []
     for cid in fused_ids:
@@ -82,7 +90,9 @@ def retrieve_relevant_chunks(
         c["score"] = float(score)
 
     candidates.sort(key=lambda c: c["score"], reverse=True)    
-
+    
+    logger.info(f"Returning top {len(candidates[:top_k])} after re-ranking")
+    
     return candidates[:top_k]
 
 
