@@ -115,12 +115,18 @@ async def ask_question(question: str):
 async def ask_question_stream(question: str):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
+    
+    logger.info(f"Streaming question received: {question}")
+    
     try:
         chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
     except Exception as e:
+        logger.error(f"Retrieval failed for streaming question '{question}': {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving relevant chunks: {str(e)}")    
 
     if not chunks:
+        logger.info(f"No relevant chunks found for streaming question: {question}")
+        
         def empty_response():
             yield "I don't have enough information in the provided documents to answer that."
         return StreamingResponse(empty_response(), media_type="text/plain")
@@ -131,7 +137,9 @@ async def ask_question_stream(question: str):
         try:
             async for piece in call_llm_stream(messages):
                 yield piece
+            logger.info(f"Finished streaming answer for: {question}")    
         except Exception as e:
+            logger.error(f"Streaming error for question '{question}': {e}")
             yield f"\n[Error: {str(e)}]"
 
     return StreamingResponse(generate(), media_type="text/plain")    
