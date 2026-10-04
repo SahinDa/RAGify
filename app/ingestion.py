@@ -9,6 +9,8 @@ import re
 from app.postgres_search import index_chunks
 import asyncio
 from dotenv import load_dotenv
+import logging
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 # Load embedding model once (expensive to load, so we do it at module level)
@@ -113,6 +115,8 @@ def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]
       all_chunks = []
       for section in sections:
           all_chunks.extend(_chunk_section(section, chunk_size, overlap))
+          
+      logger.info(f"Chunking complete: {len(all_chunks)} chunks from {len(sections)} section(s)")    
   
       return all_chunks
 
@@ -122,6 +126,7 @@ def embed_chunks(chunks: list[str]) -> list[list[float]]:
     Ensures calibrated cosine distance calculations in ChromaDB.
     """
     embeddings = embedding_model.encode(chunks,normalize_embeddings=True)
+    logger.info(f"Embedded {len(chunks)} chunks")
     return embeddings.tolist()  # Chroma expects plain lists, not numpy arrays 
 
 def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filename: str):
@@ -150,8 +155,15 @@ def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filena
         documents=chunks,
         metadatas=metadatas
     )
-
-    asyncio.run(index_chunks(chunks,ids,source_filename))
+    
+    logger.info(f"Stored {len(chunks)} chunks in ChromaDB for {source_filename}")
+    try:
+        asyncio.run(index_chunks(chunks,ids,source_filename))
+        logger.info(f"Stored {len(chunks)} chunks in Postgres for {source_filename}")
+    except Exception as e :
+        logger.error(f"Failed to index chunks into Postgres for {source_filename}: {e}")
+        raise
+            
     
 
 def parse_file(filename: str, content: bytes) -> str:
@@ -166,7 +178,7 @@ def parse_file(filename: str, content: bytes) -> str:
         Extracted plain text as a string
     """
     if filename.lower().endswith(".txt"):
-        return content.decode("utf-8")
+        text = content.decode("utf-8")
 
     elif filename.lower().endswith(".pdf"):
         pdf_file = io.BytesIO(content)
@@ -176,7 +188,6 @@ def parse_file(filename: str, content: bytes) -> str:
         for page in reader.pages:
             text += page.extract_text() + "\n"
 
-        return text
 
     elif filename.lower().endswith(".docx"):
         docx_file = io.BytesIO(content)
@@ -203,10 +214,14 @@ def parse_file(filename: str, content: bytes) -> str:
 
                 text += "[/TABLE]\n"
 
-        return text
 
     else:
+        logger.error(f"Unsupported file type attempted: {filename}")
         raise ValueError(f"Unsupported file type: {filename}")
+    
+    logger.info(f"Parsed {filename}: {len(text)} characters extracted")
+    return text
+
 def get_chunk_id(source_filename: str, chunk_index: int,text: str) -> str:
     """
     Generates a unique, deterministic ID tied to the file, chunk index, and content hash.
