@@ -1,20 +1,30 @@
+import logging
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from app.logging_config import setup_logging
+from app.env_check import validate_env
+
+setup_logging()
+validate_env()
+
 from fastapi import FastAPI, UploadFile, HTTPException
 from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
 import httpx
-import logging
 from app.retrieval import retrieve_relevant_chunks
 from app.llm import build_prompt, call_llm_stream
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
-from app.logging_config import setup_logging
+
 
 
 app = FastAPI(title="RAGify")
 
-setup_logging()
 logger = logging.getLogger(__name__)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
