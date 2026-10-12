@@ -108,6 +108,9 @@ async def ask_question(question: str):
     except httpx.TimeoutException:
         logger.error(f"LLM provider timed out for question: {question}")
         raise HTTPException(status_code=504, detail="LLM provider timed out. Please try again.")
+    except httpx.ConnectError:
+        logger.error(f"Could not reach LLM provider for question: {question}")
+        raise HTTPException(status_code=503, detail="LLM provider is unreachable. Please try again.")
     except Exception as e:
         logger.error(f"Unexpected LLM error for question '{question}': {e}")
         raise HTTPException(status_code=500, detail=f"Unexpected error calling LLM: {str(e)}")
