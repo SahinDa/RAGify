@@ -1,12 +1,15 @@
 import json
 import os
 import httpx
+import asyncio
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
-NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+NVIDIA_URL = os.getenv("NVIDIA_URL")
 
 
 def build_prompt(question: str, chunks: list[dict]) -> list[dict]:
@@ -30,6 +33,15 @@ def build_prompt(question: str, chunks: list[dict]) -> list[dict]:
         {"role": "user", "content": user_prompt}
     ]
 
+async def _open_stream(client: httpx.AsyncClient, headers: dict, payload: dict):
+    """
+    Opens the streaming POST request, retrying on transient network errors
+    (timeouts, connection failures) with exponential backoff. Does not retry
+    on HTTP error responses (4xx/5xx) — those are raised immediately via
+    raise_for_status() after the connection succeeds.
+    """
+    response = client.stream("POST", NVIDIA_URL, headers=headers, json=payload)
+    return response
 
 async def call_llm_stream(messages: list[dict], model: str = "meta/llama-3.2-11b-vision-instruct",stream:bool =True):
     """
@@ -55,26 +67,40 @@ async def call_llm_stream(messages: list[dict], model: str = "meta/llama-3.2-11b
     }
 
     async with httpx.AsyncClient(timeout=30) as client:
-        async with client.stream("POST", NVIDIA_URL, headers=headers, json=payload) as response:
-            response.raise_for_status()
+        yielded_any = False
+        for attempt in range(3):
+            try:
+                async with client.stream("POST", NVIDIA_URL, headers=headers, json=payload) as response:
+                    response.raise_for_status()
             
-            async for line in response.aiter_lines():
-                if not line:
-                    continue
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
                 
-                if line.startswith("data: "):
-                    data_str = line[len("data: "):]
+                        if line.startswith("data: "):
+                            data_str = line[len("data: "):]
                     
                     
-                    if data_str.strip() == "[DONE]":
-                        break
+                            if data_str.strip() == "[DONE]":
+                                break
+                            
+                            chunk = json.loads(data_str)
+                            
+                            if not chunk.get("choices"):
+                                continue # skip empty/metadata only chunks
                     
-                    chunk = json.loads(data_str)
+                            delta = chunk["choices"][0]["delta"].get("content","")
                     
-                    if not chunk.get("choices"):
-                        continue # skip empty/metadata only chunks
+                            if delta :
+                                yielded_any = True
+                                yield delta
                     
-                    delta = chunk["choices"][0]["delta"].get("content","")
+                    return   
+            except (httpx.TimeoutException, httpx.ConnectError) as e:
+                if yielded_any or attempt == 2:
+                    logger.error(f"LLM call failed (attempt {attempt + 1}, partial output sent: {yielded_any}): {e}")
+                    raise 
                     
-                    if delta :
-                        yield delta
+                wait_time = 2 ** attempt
+                logger.warning(f"LLM call attempt {attempt + 1} failed ({e}), retrying in {wait_time}s")
+                await asyncio.sleep(wait_time)            
