@@ -95,11 +95,13 @@ async def ask_question(question: str,conversation_id: str):
     if not chunks:
         logger.info(f"No chunks found for question: {question}")
         answer = "I don't have enough information in the provided documents to answer that."
+
         conversation_memory.add_turn(
         conversation_id=conversation_id,
         question=question,
         answer=answer,
         )
+
         return {
             "question": question,
             "answer": answer,
@@ -140,11 +142,13 @@ async def ask_question(question: str,conversation_id: str):
 
 
 @app.post("/ask/stream")
-async def ask_question_stream(question: str):
+async def ask_question_stream(question: str,conversation_id: str):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
     logger.info(f"Streaming question received: {question}")
+
+    context = conversation_memory.get_context(conversation_id)
     
     try:
         chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
@@ -156,15 +160,33 @@ async def ask_question_stream(question: str):
         logger.info(f"No relevant chunks found for streaming question: {question}")
         
         def empty_response():
-            yield "I don't have enough information in the provided documents to answer that."
+            answer = "I don't have enough information in the provided documents to answer that."
+            conversation_memory.add_turn(
+                conversation_id=conversation_id,
+                question=question,
+                answer=answer,
+                )
+            yield answer
+            
         return StreamingResponse(empty_response(), media_type="text/plain")
 
     messages = build_prompt(question, chunks)
 
     async def generate():
+        answer_parts = []
         try:
             async for piece in call_llm_stream(messages):
+                answer_parts.append(piece)
                 yield piece
+
+            answer = "".join(answer_parts)
+                
+            conversation_memory.add_turn(
+                conversation_id=conversation_id,
+                question=question,
+                answer=answer,
+            )
+
             logger.info(f"Finished streaming answer for: {question}")    
         except Exception as e:
             logger.error(f"Streaming error for question '{question}': {e}")
