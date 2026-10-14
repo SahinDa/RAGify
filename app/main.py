@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
+from app.memory import conversation_memory
 
 
 
@@ -77,12 +78,14 @@ async def upload_file(file: UploadFile):
     }
 
 @app.post("/ask")
-async def ask_question(question: str):
+async def ask_question(question: str,conversation_id: str):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
     logger.info(f"Question received: {question}")
-    
+
+    context = conversation_memory.get_context(conversation_id)
+
     try:
         chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
     except Exception as e:
@@ -91,9 +94,15 @@ async def ask_question(question: str):
 
     if not chunks:
         logger.info(f"No chunks found for question: {question}")
+        answer = "I don't have enough information in the provided documents to answer that."
+        conversation_memory.add_turn(
+        conversation_id=conversation_id,
+        question=question,
+        answer=answer,
+        )
         return {
             "question": question,
-            "answer": "I don't have enough information in the provided documents to answer that.",
+            "answer": answer,
             "sources": []
         }
 
@@ -116,6 +125,12 @@ async def ask_question(question: str):
         raise HTTPException(status_code=500, detail=f"Unexpected error calling LLM: {str(e)}")
     
     logger.info(f"Answered question (answer length: {len(answer)} chars, {len(chunks)} sources)")
+
+    conversation_memory.add_turn(
+    conversation_id=conversation_id,
+    question=question,
+    answer=answer,
+    )
 
     return {
         "question": question,
