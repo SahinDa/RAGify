@@ -235,4 +235,16 @@ async def ask_question_stream(
             logger.error(f"Streaming error for question '{question}': {e}")
             yield f"\n[Error: {str(e)}]"
 
-    return StreamingResponse(generate(), media_type="text/plain")    
+    return StreamingResponse(generate(), media_type="text/plain")   
+
+@app.get("/memory/{conversation_id}/summary")
+async def get_summary(conversation_id: str):
+    """
+    Returns the current rolling summary and turn metadata for a given conversation.
+    """
+    context = conversation_memory.get_context(conversation_id)
+    return {
+        "conversation_id": conversation_id,
+        "summary": context["summary"],
+        "turn_count": len(context["recent_turns"]),
+    } 
