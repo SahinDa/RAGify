@@ -13,7 +13,7 @@ from fastapi import FastAPI, UploadFile, HTTPException
 from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
 import httpx
 from app.retrieval import retrieve_relevant_chunks
-from app.llm import build_prompt, call_llm_stream
+from app.llm import build_prompt, call_llm_stream , contextualize_query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.responses import StreamingResponse
@@ -84,10 +84,19 @@ async def ask_question(question: str,conversation_id: str):
     
     logger.info(f"Question received: {question}")
 
+    # Fetch memory context
     context = conversation_memory.get_context(conversation_id)
+    
+    # Decode raw question into a standalone search query
+    search_query = await contextualize_query(
+        question=question,
+        recent_turns=context["recent_turns"],
+        summary=context["summary"]
+    )
+    logger.info(f"Resolved search query: '{search_query}' (Original: '{question}')")
 
     try:
-        chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
+        chunks = await run_in_threadpool(retrieve_relevant_chunks,search_query)
     except Exception as e:
         logger.error(f"Retrieval failed for question '{question}': {e}")
         raise HTTPException(status_code=500,detail=f"Error retrieving relevant chunks: {str(e)}")    
@@ -147,11 +156,20 @@ async def ask_question_stream(question: str,conversation_id: str):
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
     logger.info(f"Streaming question received: {question}")
-
+    
+    # Fetch memory context
     context = conversation_memory.get_context(conversation_id)
     
+    # Decode raw question into a standalone search query
+    search_query = await contextualize_query(
+        question=question,
+        recent_turns=context["recent_turns"],
+        summary=context["summary"]
+    )
+    logger.info(f"Resolved search query: '{search_query}' (Original: '{question}')")
+    
     try:
-        chunks = await run_in_threadpool(retrieve_relevant_chunks,question)
+        chunks = await run_in_threadpool(retrieve_relevant_chunks,search_query)
     except Exception as e:
         logger.error(f"Retrieval failed for streaming question '{question}': {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving relevant chunks: {str(e)}")    
