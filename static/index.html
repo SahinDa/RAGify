@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RAGify</title>
     <style>
         body {
@@ -37,25 +39,88 @@
             border-radius: 5px;
             cursor: pointer;
             margin-right: 10px;
+            margin-bottom: 5px;
         }
 
         button:disabled {
             background: #999;
+            cursor: not-allowed;
         }
 
-        #answer {
-            margin-top: 15px;
-            padding: 15px;
-            background: #f5f5f5;
-            border-radius: 5px;
+        .btn-clear {
+            background: #ef4444;
+            float: right;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        #memory-panel {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+            font-size: 0.875rem;
+        }
+
+        #memory-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        #summary-badge {
+            font-size: 0.75rem;
+            background: #e2e8f0;
+            color: #334155;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        #summary-text {
+            margin-top: 8px;
+            color: #475569;
+            font-style: italic;
+            display: none;
+            line-height: 1.4;
             white-space: pre-wrap;
-            min-height: 20px;
         }
 
-        #sources {
-            margin-top: 10px;
-            font-size: 0.85em;
-            color: #666;
+        #chat-history {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .chat-bubble {
+            padding: 12px 15px;
+            border-radius: 8px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+
+        .chat-bubble.user {
+            background: #e0f2fe;
+            color: #0369a1;
+            align-self: flex-end;
+            max-width: 80%;
+        }
+
+        .chat-bubble.assistant {
+            background: #f1f5f9;
+            color: #1e293b;
+            align-self: flex-start;
+            max-width: 90%;
+        }
+
+        .sources {
+            margin-top: 6px;
+            font-size: 0.8em;
+            color: #64748b;
         }
 
         .status {
@@ -79,15 +144,129 @@
     </section>
 
     <section>
-        <h2>Ask a Question</h2>
-        <input type="text" id="questionInput" placeholder="Ask something about your uploaded documents..." />
-        <button onclick="askQuestion()">Ask</button>
-        <button onclick="askQuestionStream()">Ask (Streaming)</button>
-        <div id="answer"></div>
-        <div id="sources"></div>
+        <div style="overflow: hidden; margin-bottom: 10px;">
+            <h2 style="display: inline-block; margin: 0;">Ask a Question</h2>
+            <button class="btn-clear" onclick="clearConversation()">Reset Chat</button>
+        </div>
+
+        <!-- Rolling Summary & Memory Context Panel -->
+        <div id="memory-panel">
+            <div id="memory-header" onclick="toggleSummary()">
+                <span style="font-weight: 600; color: #475569;">Context Memory & Summary</span>
+                <span id="summary-badge">Recent Turns: 0</span>
+            </div>
+            <p id="summary-text">No older context summarized yet.</p>
+        </div>
+
+        <input type="text" id="questionInput" placeholder="Ask something about your uploaded documents..."
+            onkeydown="if(event.key === 'Enter') askQuestionStream()" />
+        <button id="askBtn" onclick="askQuestion()">Ask</button>
+        <button id="askStreamBtn" onclick="askQuestionStream()">Ask (Streaming)</button>
+
+        <!-- Message History Feed -->
+        <div id="chat-history"></div>
     </section>
 
     <script>
+        // 1. Conversation ID Management
+        let conversationId = localStorage.getItem("ragify_conversation_id");
+        if (!conversationId) {
+            conversationId = "conv_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+            localStorage.setItem("ragify_conversation_id", conversationId);
+        }
+
+        // 2. UI Helpers & Chat DOM Rendering
+        function appendUserMessage(text) {
+            const historyContainer = document.getElementById("chat-history");
+            const div = document.createElement("div");
+            div.className = "chat-bubble user";
+            div.textContent = text;
+            historyContainer.appendChild(div);
+            div.scrollIntoView({ behavior: "smooth" });
+        }
+
+        function createAssistantMessagePlaceholder() {
+            const historyContainer = document.getElementById("chat-history");
+            const div = document.createElement("div");
+            div.className = "chat-bubble assistant";
+
+            const textSpan = document.createElement("div");
+            textSpan.className = "text-content";
+            div.appendChild(textSpan);
+
+            const sourcesDiv = document.createElement("div");
+            sourcesDiv.className = "sources";
+            div.appendChild(sourcesDiv);
+
+            historyContainer.appendChild(div);
+            div.scrollIntoView({ behavior: "smooth" });
+            return { bubble: div, textSpan, sourcesDiv };
+        }
+
+        function saveTurnToLocalStorage(question, answer, sources = []) {
+            const history = JSON.parse(localStorage.getItem("ragify_chat_history") || "[]");
+            history.push({ question, answer, sources, timestamp: new Date().toISOString() });
+            localStorage.setItem("ragify_chat_history", JSON.stringify(history));
+        }
+
+        function restoreChatHistory() {
+            const history = JSON.parse(localStorage.getItem("ragify_chat_history") || "[]");
+            history.forEach(item => {
+                appendUserMessage(item.question);
+                const { textSpan, sourcesDiv } = createAssistantMessagePlaceholder();
+                textSpan.textContent = item.answer;
+                if (item.sources && item.sources.length > 0) {
+                    const uniqueSources = [...new Set(item.sources.map(s => s.source || s))];
+                    sourcesDiv.textContent = "Sources: " + uniqueSources.join(", ");
+                }
+            });
+            syncMemorySummary();
+        }
+
+        function clearConversation() {
+            localStorage.removeItem("ragify_chat_history");
+            localStorage.removeItem("ragify_conversation_id");
+            conversationId = "conv_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+            localStorage.setItem("ragify_conversation_id", conversationId);
+            document.getElementById("chat-history").innerHTML = "";
+            document.getElementById("summary-text").textContent = "No older context summarized yet.";
+            document.getElementById("summary-text").style.fontStyle = "italic";
+            document.getElementById("summary-badge").textContent = "Recent Turns: 0";
+        }
+
+        function toggleSummary() {
+            const summaryTextEl = document.getElementById("summary-text");
+            summaryTextEl.style.display = summaryTextEl.style.display === "none" ? "block" : "none";
+        }
+
+        async function syncMemorySummary() {
+            try {
+                const response = await fetch(`/memory/${conversationId}/summary`);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                const summaryTextEl = document.getElementById("summary-text");
+                const summaryBadgeEl = document.getElementById("summary-badge");
+
+                if (summaryBadgeEl) {
+                    summaryBadgeEl.textContent = `Recent Turns: ${data.turn_count}`;
+                }
+
+                if (summaryTextEl) {
+                    if (data.summary && data.summary.trim()) {
+                        summaryTextEl.textContent = data.summary;
+                        summaryTextEl.style.fontStyle = "normal";
+                    } else {
+                        summaryTextEl.textContent = "No older context summarized yet.";
+                        summaryTextEl.style.fontStyle = "italic";
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not sync conversation summary:", err);
+            }
+        }
+
+        // 3. Document Upload Function
         async function uploadFile() {
             const fileInput = document.getElementById("fileInput");
             const statusEl = document.getElementById("uploadStatus");
@@ -124,81 +303,84 @@
             }
         }
 
-        // Non-streaming: waits for full answer, but includes sources
+        // 4. Non-Streaming Ask Question
         async function askQuestion() {
             const questionInput = document.getElementById("questionInput");
-            const answerEl = document.getElementById("answer");
-            const sourcesEl = document.getElementById("sources");
-
             const question = questionInput.value.trim();
-            if (!question) {
-                answerEl.textContent = "Please type a question.";
-                return;
-            }
+            if (!question) return;
 
-            answerEl.textContent = "Thinking...";
-            sourcesEl.textContent = "";
+            questionInput.value = "";
+            appendUserMessage(question);
+
+            const { textSpan, sourcesDiv } = createAssistantMessagePlaceholder();
+            textSpan.textContent = "Thinking...";
 
             try {
-                const response = await fetch(`/ask?question=${encodeURIComponent(question)}`, {
-                    method: "POST"
-                });
+                const url = `/ask?question=${encodeURIComponent(question)}&conversation_id=${encodeURIComponent(conversationId)}`;
+                const response = await fetch(url, { method: "POST" });
                 const data = await response.json();
 
                 if (response.ok) {
-                    answerEl.textContent = data.answer;
+                    textSpan.textContent = data.answer;
                     if (data.sources && data.sources.length > 0) {
                         const uniqueSources = [...new Set(data.sources.map(s => s.source))];
-                        sourcesEl.textContent = "Sources: " + uniqueSources.join(", ");
+                        sourcesDiv.textContent = "Sources: " + uniqueSources.join(", ");
                     }
+                    saveTurnToLocalStorage(question, data.answer, data.sources || []);
+                    setTimeout(syncMemorySummary, 2000);
                 } else {
-                    answerEl.textContent = `Error: ${data.detail}`;
+                    textSpan.textContent = `Error: ${data.detail}`;
                 }
             } catch (err) {
-                answerEl.textContent = "Request failed: " + err.message;
+                textSpan.textContent = "Request failed: " + err.message;
             }
         }
 
-        // Streaming: answer appears progressively, but no sources (known limitation)
+        // 5. Streaming Ask Question
         async function askQuestionStream() {
             const questionInput = document.getElementById("questionInput");
-            const answerEl = document.getElementById("answer");
-            const sourcesEl = document.getElementById("sources");
-
             const question = questionInput.value.trim();
-            if (!question) {
-                answerEl.textContent = "Please type a question.";
-                return;
-            }
+            if (!question) return;
 
-            answerEl.textContent = "";
-            sourcesEl.textContent = "(streaming mode — sources not shown)";
+            questionInput.value = "";
+            appendUserMessage(question);
+
+            const { textSpan, sourcesDiv } = createAssistantMessagePlaceholder();
+            textSpan.textContent = "";
+            sourcesDiv.textContent = "(streaming mode — sources not shown)";
 
             try {
-                const response = await fetch(`/ask/stream?question=${encodeURIComponent(question)}`, {
-                    method: "POST"
-                });
+                const url = `/ask/stream?question=${encodeURIComponent(question)}&conversation_id=${encodeURIComponent(conversationId)}`;
+                const response = await fetch(url, { method: "POST" });
 
                 if (!response.ok) {
                     const data = await response.json();
-                    answerEl.textContent = `Error: ${data.detail}`;
+                    textSpan.textContent = `Error: ${data.detail}`;
                     return;
                 }
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                let fullAnswer = "";
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
                     const textChunk = decoder.decode(value, { stream: true });
-                    answerEl.textContent += textChunk;
+                    fullAnswer += textChunk;
+                    textSpan.textContent = fullAnswer;
                 }
+
+                saveTurnToLocalStorage(question, fullAnswer, []);
+                setTimeout(syncMemorySummary, 2000);
             } catch (err) {
-                answerEl.textContent = "Request failed: " + err.message;
+                textSpan.textContent = "Request failed: " + err.message;
             }
         }
+
+        // 6. Restore State on Page Load
+        window.addEventListener("DOMContentLoaded", restoreChatHistory);
     </script>
 </body>
 
