@@ -9,7 +9,7 @@ from app.env_check import validate_env
 setup_logging()
 validate_env()
 
-from fastapi import FastAPI, UploadFile, HTTPException
+from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks
 from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
 import httpx
 from app.retrieval import retrieve_relevant_chunks
@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from app.memory import conversation_memory
+from app.summarizer import trigger_summarization_if_needed
 
 
 
@@ -78,7 +79,11 @@ async def upload_file(file: UploadFile):
     }
 
 @app.post("/ask")
-async def ask_question(question: str,conversation_id: str):
+async def ask_question(
+    question: str,
+    conversation_id: str,
+    background_tasks: BackgroundTasks
+    ):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
@@ -147,6 +152,10 @@ async def ask_question(question: str,conversation_id: str):
     question=question,
     answer=answer,
     )
+    
+    # Schedule background summarization
+    background_tasks.add_task(trigger_summarization_if_needed, conversation_id)
+    
 
     return {
         "question": question,
@@ -156,7 +165,11 @@ async def ask_question(question: str,conversation_id: str):
 
 
 @app.post("/ask/stream")
-async def ask_question_stream(question: str,conversation_id: str):
+async def ask_question_stream(
+    question: str,
+    conversation_id: str,
+    background_tasks: BackgroundTasks
+    ):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
@@ -213,6 +226,9 @@ async def ask_question_stream(question: str,conversation_id: str):
                 question=question,
                 answer=answer,
             )
+            
+            # Trigger summarization in background after turn is added
+            background_tasks.add_task(trigger_summarization_if_needed, conversation_id)
 
             logger.info(f"Finished streaming answer for: {question}")    
         except Exception as e:
