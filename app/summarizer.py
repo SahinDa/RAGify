@@ -64,8 +64,8 @@ async def trigger_summarization_if_needed(conversation_id: str):
             if new_summary:
                 conversation_memory.commit_summary(
                     conversation_id=conversation_id,
-                    new_summary=new_summary,
-                    turn_count=count,
+                    summary=new_summary,
+                    summarized_turns=count,
                     expected_version=version,
                 )
                 logger.info(f"Summarization committed for conversation {conversation_id} (version {version + 1})")
