@@ -12,11 +12,21 @@ NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 NVIDIA_URL = os.getenv("NVIDIA_URL")
 
 
-def build_prompt(question: str, chunks: list[dict],summary: str = "",) -> list[dict]:
-    """         
-    Builds the messages list for the LLM, injecting retrieved chunks as context.
+def build_prompt(
+    question: str,
+    chunks: list[dict],
+    summary: str = "",
+    recent_turns: list[dict] = None,
+) -> list[dict]:
     """
-    context_text = "\n\n".join([f"[Chunk {i+1}]: {c['text']}" for i, c in enumerate(chunks)])
+    Builds the messages array for the LLM:
+    1. System instructions.
+    2. High-level summary of older turns (if any).
+    3. Recent conversation turns as native role turns.
+    4. Retrieved grounding chunks + latest user question.
+    """
+    if recent_turns is None:
+        recent_turns = []
 
     system_prompt = (
         "You are a helpful assistant that answers questions using ONLY the provided context. "
@@ -26,16 +36,29 @@ def build_prompt(question: str, chunks: list[dict],summary: str = "",) -> list[d
         "Do not guess or make up information."
     )
 
+    messages = [{"role": "system", "content": system_prompt}]
+
+    # Inject rolling summary of older turns
+    if summary and summary.strip():
+        messages.append({
+            "role": "system",
+            "content": f"Summary of earlier conversation context:\n{summary.strip()}"
+        })
+
+    # Inject recent back-and-forth turns
+    for turn in recent_turns:
+        messages.append({"role": "user", "content": turn["question"]})
+        messages.append({"role": "assistant", "content": turn["answer"]})
+
+    # Ground latest question with retrieved context chunks
+    context_text = "\n\n".join([f"[Chunk {i+1}]: {c['text']}" for i, c in enumerate(chunks)])
     user_prompt = (
-        f"Conversation summary:\n{summary[:6000] or '(No previous conversation)'}\n\n"
         f"Context:\n{context_text}\n\n"
         f"Question: {question}"
     )
+    messages.append({"role": "user", "content": user_prompt})
 
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt}
-    ]
+    return messages
 
 async def _open_stream(client: httpx.AsyncClient, headers: dict, payload: dict):
     """

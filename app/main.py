@@ -117,7 +117,12 @@ async def ask_question(question: str,conversation_id: str):
             "sources": []
         }
 
-    messages = build_prompt(question, chunks)
+    messages = build_prompt(
+        question, 
+        chunks,
+        summary=context["summary"],
+        recent_turns=context["recent_turns"]
+        )
 
     try:
         pieces = [piece async for piece in call_llm_stream(messages)]
@@ -188,7 +193,11 @@ async def ask_question_stream(question: str,conversation_id: str):
             
         return StreamingResponse(empty_response(), media_type="text/plain")
 
-    messages = build_prompt(question, chunks)
+    messages = build_prompt(question, 
+                            chunks,
+                            summary=context["summary"],
+                            recent_turns=context["recent_turns"]
+                            )
 
     async def generate():
         answer_parts = []
