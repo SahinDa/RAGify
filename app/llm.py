@@ -12,7 +12,7 @@ NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 NVIDIA_URL = os.getenv("NVIDIA_URL")
 
 
-def build_prompt(question: str, chunks: list[dict]) -> list[dict]:
+def build_prompt(question: str, chunks: list[dict],summary: str = "",) -> list[dict]:
     """         
     Builds the messages list for the LLM, injecting retrieved chunks as context.
     """
@@ -26,7 +26,11 @@ def build_prompt(question: str, chunks: list[dict]) -> list[dict]:
         "Do not guess or make up information."
     )
 
-    user_prompt = f"Context:\n{context_text}\n\nQuestion: {question}"
+    user_prompt = (
+        f"Conversation summary:\n{summary[:6000] or '(No previous conversation)'}\n\n"
+        f"Context:\n{context_text}\n\n"
+        f"Question: {question}"
+    )
 
     return [
         {"role": "system", "content": system_prompt},
