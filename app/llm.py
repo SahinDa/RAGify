@@ -108,3 +108,69 @@ async def call_llm_stream(messages: list[dict], model: str = "meta/llama-3.2-11b
                 wait_time = 2 ** attempt
                 logger.warning(f"LLM call attempt {attempt + 1} failed ({e}), retrying in {wait_time}s")
                 await asyncio.sleep(wait_time)            
+
+async def contextualize_query(
+    question: str,
+    recent_turns: list[dict],
+    summary: str = "",
+    model: str = "meta/llama-3.2-11b-vision-instruct",
+) -> str:
+    """
+    Decodes follow-up questions containing pronouns or implicit references
+    (e.g., 'its advantages', 'how does it work?') into a standalone search query
+    using the last 3 conversation turns and the rolling summary.
+    """
+    # If there is no previous context, return the question as-is immediately
+    if not recent_turns and not summary:
+        return question
+
+    # Build context window from summary + up to last 3 turns
+    history_lines = []
+    if summary and summary.strip():
+        history_lines.append(f"Summary of earlier conversation:\n{summary.strip()}")
+
+    for turn in recent_turns[-3:]:
+        history_lines.append(f"User: {turn['question']}")
+        history_lines.append(f"Assistant: {turn['answer']}")
+
+    history_text = "\n".join(history_lines)
+
+    system_prompt = (
+        "You are a query reformulator. Your job is to resolve pronouns and implicit "
+        "references in a follow-up user question based on the conversation history. "
+        "Output ONLY a direct, standalone search query. "
+        "Do NOT answer the question. Do NOT add preamble or quotes."
+    )
+
+    user_prompt = (
+        f"Conversation History:\n{history_text}\n\n"
+        f"Follow-up Question: {question}\n\n"
+        f"Standalone Question:"
+    )
+
+    headers = {
+        "Authorization": f"Bearer {NVIDIA_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "max_tokens": 128,
+        "temperature": 0.0,
+        "stream": False,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(NVIDIA_URL, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            rewritten = data["choices"][0]["message"]["content"].strip()
+            return rewritten if rewritten else question
+    except Exception as e:
+        logger.warning(f"Query contextualization failed ({e}), falling back to original query.")
+        return question
