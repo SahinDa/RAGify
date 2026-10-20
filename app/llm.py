@@ -8,9 +8,15 @@ import logging
 load_dotenv()
 logger = logging.getLogger(__name__)
 
+ENVIRONMENT = os.getenv("ENVIRONMENT", "dev").lower()
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 NVIDIA_URL = os.getenv("NVIDIA_URL")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+gemini_client = None
+if ENVIRONMENT == "prod":
+    from google import genai
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 def build_prompt(
     question: str,
@@ -60,25 +66,48 @@ def build_prompt(
 
     return messages
 
-async def _open_stream(client: httpx.AsyncClient, headers: dict, payload: dict):
-    """
-    Opens the streaming POST request, retrying on transient network errors
-    (timeouts, connection failures) with exponential backoff. Does not retry
-    on HTTP error responses (4xx/5xx) — those are raised immediately via
-    raise_for_status() after the connection succeeds.
-    """
-    response = client.stream("POST", NVIDIA_URL, headers=headers, json=payload)
-    return response
 
-async def call_llm_stream(messages: list[dict], model: str = "meta/llama-3.2-11b-vision-instruct",stream:bool =True):
-    """
-    Streams the LLM's response piece by piece instead of waiting for the full answer.
-    Yields text chunks as they arrive.
-    """
-    if not NVIDIA_API_KEY :
-        raise RuntimeError("NVIDIA API key is missing. "
-                           "Please set NVIDIA_API_KEY in your .env file."
-                           )
+async def _call_gemini_stream(messages: list[dict]):
+    """Streams response from Gemini 2.0 Flash in prod."""
+    system_instruction = ""
+    contents = []
+
+    for msg in messages:
+        if msg["role"] == "system":
+            system_instruction += (msg["content"] + "\n\n")
+        else:
+            role = "user" if msg["role"] == "user" else "model"
+            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+
+    config = {
+        "temperature": 0.2,
+        "max_output_tokens": 512,
+    }
+    if system_instruction.strip():
+        config["system_instruction"] = system_instruction.strip()
+
+    try:
+        response = await asyncio.to_thread(
+            gemini_client.models.generate_content_stream,
+            model="gemini-2.0-flash",
+            contents=contents,
+            config=config,
+        )
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+    except Exception as e:
+        logger.error(f"Gemini streaming error: {e}")
+        raise
+
+
+async def _call_nvidia_stream(messages: list[dict], model: str, stream: bool):
+    """Streams response from NVIDIA API in dev."""
+    if not NVIDIA_API_KEY:
+        raise RuntimeError(
+            "NVIDIA API key is missing. Please set NVIDIA_API_KEY in your .env file."
+        )
+
     headers = {
         "Authorization": f"Bearer {NVIDIA_API_KEY}",
         "Content-Type": "application/json",
@@ -99,38 +128,60 @@ async def call_llm_stream(messages: list[dict], model: str = "meta/llama-3.2-11b
             try:
                 async with client.stream("POST", NVIDIA_URL, headers=headers, json=payload) as response:
                     response.raise_for_status()
-            
+
                     async for line in response.aiter_lines():
                         if not line:
                             continue
-                
+
                         if line.startswith("data: "):
                             data_str = line[len("data: "):]
-                    
-                    
+
                             if data_str.strip() == "[DONE]":
                                 break
-                            
+
                             chunk = json.loads(data_str)
-                            
+
                             if not chunk.get("choices"):
-                                continue # skip empty/metadata only chunks
-                    
-                            delta = chunk["choices"][0]["delta"].get("content","")
-                    
-                            if delta :
+                                continue
+
+                            delta = chunk["choices"][0]["delta"].get("content", "")
+
+                            if delta:
                                 yielded_any = True
                                 yield delta
-                    
-                    return   
+
+                    return
             except (httpx.TimeoutException, httpx.ConnectError) as e:
                 if yielded_any or attempt == 2:
-                    logger.error(f"LLM call failed (attempt {attempt + 1}, partial output sent: {yielded_any}): {e}")
-                    raise 
-                    
+                    logger.error(
+                        f"LLM call failed (attempt {attempt + 1}, partial output sent: {yielded_any}): {e}"
+                    )
+                    raise
+
                 wait_time = 2 ** attempt
-                logger.warning(f"LLM call attempt {attempt + 1} failed ({e}), retrying in {wait_time}s")
-                await asyncio.sleep(wait_time)            
+                logger.warning(
+                    f"LLM call attempt {attempt + 1} failed ({e}), retrying in {wait_time}s"
+                )
+                await asyncio.sleep(wait_time)
+
+
+async def call_llm_stream(
+    messages: list[dict],
+    model: str = "meta/llama-3.2-11b-vision-instruct",
+    stream: bool = True
+):
+    """
+    Streams the LLM's response piece by piece.
+    - PROD: Streams via Gemini 2.0 Flash (google-genai SDK).
+    - DEV: Streams via NVIDIA API over HTTPX.
+    """
+    if ENVIRONMENT == "prod":
+        async for chunk in _call_gemini_stream(messages):
+            yield chunk
+    else:
+        async for chunk in _call_nvidia_stream(messages, model=model, stream=stream):
+            yield chunk
+
 
 async def contextualize_query(
     question: str,
@@ -140,14 +191,11 @@ async def contextualize_query(
 ) -> str:
     """
     Decodes follow-up questions containing pronouns or implicit references
-    (e.g., 'its advantages', 'how does it work?') into a standalone search query
-    using the last 3 conversation turns and the rolling summary.
+    into a standalone search query using the last 3 conversation turns and rolling summary.
     """
-    # If there is no previous context, return the question as-is immediately
     if not recent_turns and not summary:
         return question
 
-    # Build context window from summary + up to last 3 turns
     history_lines = []
     if summary and summary.strip():
         history_lines.append(f"Summary of earlier conversation:\n{summary.strip()}")
@@ -171,6 +219,26 @@ async def contextualize_query(
         f"Standalone Question:"
     )
 
+    # PROD Branch: Gemini API
+    if ENVIRONMENT == "prod":
+        try:
+            response = await asyncio.to_thread(
+                gemini_client.models.generate_content,
+                model="gemini-2.0-flash",
+                contents=user_prompt,
+                config={
+                    "system_instruction": system_prompt,
+                    "max_output_tokens": 128,
+                    "temperature": 0.0,
+                }
+            )
+            rewritten = response.text.strip() if response.text else question
+            return rewritten
+        except Exception as e:
+            logger.warning(f"Gemini query contextualization failed ({e}), falling back to original query.")
+            return question
+
+    # DEV Branch: NVIDIA API
     headers = {
         "Authorization": f"Bearer {NVIDIA_API_KEY}",
         "Content-Type": "application/json",
