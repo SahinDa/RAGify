@@ -158,7 +158,7 @@
             border-color: #ef4444;
         }
 
-        /* --- File Upload Bar --- */
+        /* --- Minimal Document Upload Bar --- */
         .doc-bar {
             background-color: var(--surface-bar);
             border-bottom: 1px solid var(--border-subtle);
@@ -189,66 +189,22 @@
             background-color: rgba(2, 132, 199, 0.08);
         }
 
+        .dropzone-pill.success {
+            border-color: #10b981;
+            background-color: rgba(16, 185, 129, 0.08);
+            color: #10b981;
+        }
+
         .dropzone-pill strong {
             color: var(--border-accent);
         }
 
+        .dropzone-pill.success strong {
+            color: #10b981;
+        }
+
         input[type="file"] {
             display: none;
-        }
-
-        .active-file-card {
-            display: none;
-            flex: 1;
-            background-color: var(--surface-card);
-            border: 1.5px solid var(--border-accent);
-            border-radius: 8px;
-            padding: 8px 16px;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: var(--shadow-card);
-        }
-
-        .file-meta {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 0.86rem;
-        }
-
-        .file-name-text {
-            color: var(--text-heading);
-            font-weight: 700;
-        }
-
-        .badge-ready {
-            color: #10b981;
-            font-weight: 700;
-            font-size: 0.82rem;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .file-actions {
-            display: flex;
-            gap: 6px;
-        }
-
-        .file-action-btn {
-            background-color: var(--bg-body);
-            border: 1px solid var(--border-prominent);
-            color: var(--text-muted);
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .file-action-btn:hover {
-            color: var(--text-heading);
-            border-color: var(--border-accent);
         }
 
         /* --- Scrollable Chat Stage --- */
@@ -402,7 +358,7 @@
             margin-right: 6px;
         }
 
-        /* --- ChatGPT / Gemini Action Toolbar --- */
+        /* --- Action Toolbar --- */
         .assistant-actions {
             display: flex;
             align-items: center;
@@ -602,35 +558,21 @@
         </div>
     </header>
 
-    <!-- Document Status Bar -->
+    <!-- Upload Status Bar (Confirmation Only) -->
     <div class="doc-bar">
         <div class="dropzone-pill" id="dropzone" onclick="document.getElementById('fileInput').click()">
-            <span>📄</span>
+            <span id="dropzoneIcon">📄</span>
             <span id="dropzoneText">Drop document here or <strong>browse</strong> (.pdf, .docx, .txt)</span>
-            <input type="file" id="fileInput" accept=".txt,.pdf,.docx" onchange="handleFile(this.files[0])" />
-        </div>
-
-        <div class="active-file-card" id="docCard">
-            <div class="file-meta">
-                <span class="badge-ready">● Ready</span>
-                <span class="file-name-text" id="docCardName">document.pdf</span>
-                <span style="color: var(--text-muted);" id="docCardMetrics">(0 chunks)</span>
-            </div>
-            <div class="file-actions">
-                <button class="file-action-btn" onclick="document.getElementById('fileInput').click()">Replace</button>
-                <button class="file-action-btn" onclick="detachFile()">Remove</button>
-            </div>
+            <input type="file" id="fileInput" accept=".txt,.pdf,.docx" onchange="handleSingleFile(this.files[0])" />
         </div>
     </div>
 
     <!-- Scrollable Chat Canvas -->
     <main id="chat-history">
-        <!-- Initial Blank Welcome View -->
         <div class="welcome-center" id="welcomeCenter">
             <div class="welcome-icon">💬</div>
-            <h2 class="welcome-title">How can I help with your document?</h2>
-            <p class="welcome-desc">Attach a document above and ask questions. Answers are retrieved and verified with
-                source citations.</p>
+            <h2 class="welcome-title">How can I help with your documents?</h2>
+            <p class="welcome-desc">Upload documents above and ask questions across all indexed content.</p>
         </div>
     </main>
 
@@ -639,7 +581,7 @@
         <div class="console-dock">
             <div class="input-row">
                 <textarea id="questionInput" class="input-box" rows="1"
-                    placeholder="Ask a question about your document..." oninput="autoResize(this)"
+                    placeholder="Ask a question across your documents..." oninput="autoResize(this)"
                     onkeydown="handleKey(event)"></textarea>
                 <button class="btn-send" id="submitBtn" onclick="submitQuery()">Send</button>
             </div>
@@ -698,9 +640,10 @@
             }
         }
 
-        // --- 3. Document Drag & Drop Indexing ---
+        // --- 3. Upload & Transient Confirmation Only ---
         const dropzone = document.getElementById("dropzone");
-        const docCard = document.getElementById("docCard");
+        const dropzoneIcon = document.getElementById("dropzoneIcon");
+        const dropzoneText = document.getElementById("dropzoneText");
 
         ["dragenter", "dragover"].forEach(name => {
             dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
@@ -709,13 +652,17 @@
             dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.remove("dragover"); });
         });
         dropzone.addEventListener("drop", (e) => {
-            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+            e.preventDefault();
+            dropzone.classList.remove("dragover");
+            if (e.dataTransfer.files.length) handleSingleFile(e.dataTransfer.files[0]);
         });
 
-        async function handleFile(file) {
+        async function handleSingleFile(file) {
             if (!file) return;
-            const textEl = document.getElementById("dropzoneText");
-            textEl.innerHTML = `⚡ Indexing <strong>${file.name}</strong>...`;
+
+            dropzone.classList.remove("success");
+            dropzoneIcon.textContent = "⚡";
+            dropzoneText.innerHTML = `Indexing <strong>${file.name}</strong>...`;
 
             const formData = new FormData();
             formData.append("file", file);
@@ -723,40 +670,31 @@
             try {
                 const res = await fetch("/upload", { method: "POST", body: formData });
                 const data = await res.json();
+
                 if (res.ok) {
-                    showCard(data.filename, data.chunks_created);
-                    localStorage.setItem("ragify_doc", JSON.stringify({ filename: data.filename, chunks: data.chunks_created }));
+                    // Show confirmation
+                    dropzone.classList.add("success");
+                    dropzoneIcon.textContent = "✅";
+                    dropzoneText.innerHTML = `<strong>Upload done!</strong>`;
+
+                    // Reset back to upload prompt after 3 seconds so you can upload more anytime
+                    setTimeout(() => {
+                        dropzone.classList.remove("success");
+                        dropzoneIcon.textContent = "📄";
+                        dropzoneText.innerHTML = `Drop document here or <strong>browse</strong> (.pdf, .docx, .txt)`;
+                    }, 3000);
                 } else {
-                    alert("Index failed: " + data.detail);
-                    resetDocBar();
+                    alert(`Failed to index ${file.name}: ` + (data.detail || "Server error"));
+                    dropzoneIcon.textContent = "📄";
+                    dropzoneText.innerHTML = `Drop document here or <strong>browse</strong> (.pdf, .docx, .txt)`;
                 }
             } catch (err) {
-                alert("Upload error: " + err.message);
-                resetDocBar();
+                alert(`Error uploading ${file.name}: ` + err.message);
+                dropzoneIcon.textContent = "📄";
+                dropzoneText.innerHTML = `Drop document here or <strong>browse</strong> (.pdf, .docx, .txt)`;
+            } finally {
+                document.getElementById("fileInput").value = "";
             }
-        }
-
-        function showCard(filename, chunks) {
-            dropzone.style.display = "none";
-            docCard.style.display = "flex";
-            document.getElementById("docCardName").textContent = filename;
-            document.getElementById("docCardMetrics").textContent = `(${chunks} chunks)`;
-        }
-
-        function resetDocBar() {
-            docCard.style.display = "none";
-            dropzone.style.display = "flex";
-            document.getElementById("dropzoneText").innerHTML = `Drop document here or <strong>browse</strong> (.pdf, .docx, .txt)`;
-        }
-
-        function detachFile() {
-            localStorage.removeItem("ragify_doc");
-            resetDocBar();
-        }
-
-        const savedDoc = localStorage.getItem("ragify_doc");
-        if (savedDoc) {
-            try { const d = JSON.parse(savedDoc); showCard(d.filename, d.chunks); } catch (e) { }
         }
 
         // --- 4. Chat Rendering & Helpers ---
@@ -877,8 +815,8 @@
             document.getElementById("chat-history").innerHTML = `
                 <div class="welcome-center" id="welcomeCenter">
                     <div class="welcome-icon">💬</div>
-                    <h2 class="welcome-title">How can I help with your document?</h2>
-                    <p class="welcome-desc">Attach a document above and ask questions. Answers are retrieved and verified with source citations.</p>
+                    <h2 class="welcome-title">How can I help with your documents?</h2>
+                    <p class="welcome-desc">Upload documents above and ask questions across all indexed content.</p>
                 </div>
             `;
         }
