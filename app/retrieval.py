@@ -1,13 +1,9 @@
 import asyncio
-from app.ingestion import embedding_model, collection
+from app.ingestion import collection
 from app.postgres_search import keyword_search
-from sentence_transformers import CrossEncoder
+from app.services import embedder, reranker
 import logging
 logger = logging.getLogger(__name__)
-
-# Load once at module level — same pattern as embedding_model, avoids reload per request
-reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
-
 
 def retrieve_relevant_chunks(
     question: str,
@@ -30,7 +26,7 @@ def retrieve_relevant_chunks(
     logger.info(f"Retrieving for question: {question}")
     
     # Stage 1: Vector Search 
-    question_embedding = embedding_model.encode([question],normalize_embeddings=True).tolist()
+    question_embedding = [embedder.embed_query(question)]
 
     results = collection.query(
         query_embeddings=question_embedding,
@@ -46,7 +42,7 @@ def retrieve_relevant_chunks(
     chunk_lookup = {}
     filtered_vector_ids = []
     for chunk_id, doc, dist, meta in zip(vector_ids,documents, distances, metadatas):
-        similarity = 1 - dist  # rough conversion; good enough for thresholding
+        similarity = 1.0 - dist  # rough conversion; good enough for thresholding
         chunk_lookup[chunk_id] = {"text":doc, "metadata": meta}
         if similarity >= similarity_threshold:
             filtered_vector_ids.append(chunk_id)
@@ -81,19 +77,10 @@ def retrieve_relevant_chunks(
     for cid in fused_ids:
         if cid in chunk_lookup:
             candidates.append(chunk_lookup[cid]) 
-    pairs = []
-    for c in candidates:
-        pairs.append([question,c["text"]])
-    rerank_scores = reranker.predict(pairs)
-
-    for c , score in zip(candidates, rerank_scores):
-        c["score"] = float(score)
-
-    candidates.sort(key=lambda c: c["score"], reverse=True)    
-    
-    logger.info(f"Returning top {len(candidates[:top_k])} after re-ranking")
-    
-    return candidates[:top_k]
+   
+    final_results = reranker.rerank(question, candidates, top_k=top_k)
+    logger.info(f"Returning top {len(final_results)} after re-ranking")
+    return final_results
 
 
 def reciprocal_rank_fusion(vector_ids: list[str], keyword_ids: list[str], k: int = 60) -> list[str]:
