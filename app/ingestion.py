@@ -1,6 +1,6 @@
 import chromadb
 import os
-from sentence_transformers import SentenceTransformer
+from app.services import embedder
 from pypdf import PdfReader
 import io
 import hashlib
@@ -13,8 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-# Load embedding model once (expensive to load, so we do it at module level)
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+
 
 #Local Chromadb Setup
 # Persistent Chroma client - saves data to disk in chroma_db/ folder
@@ -28,8 +27,9 @@ chroma_client = chromadb.CloudClient(
 )
 
 # Create (or get existing) collection - think of this like a "table" for our chunks
+COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "ragify_docs")
 collection = chroma_client.get_or_create_collection(
-    name="ragify_docs",
+    name=COLLECTION_NAME,
     metadata={"hnsw:space": "cosine"} 
     )
 
@@ -122,12 +122,12 @@ def chunk_text(text: str, chunk_size: int = 200, overlap: int = 50) -> list[str]
 
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
     """
-    Converts a list of text chunks into normalized embedding vectors (L2 norm = 1.0).
-    Ensures calibrated cosine distance calculations in ChromaDB.
+    Converts a list of text chunks into normalized embedding vectors.
+    Uses MiniLM in dev and text-embedding-004 in prod via app.services.embedder.
     """
-    embeddings = embedding_model.encode(chunks,normalize_embeddings=True)
+    embeddings = embedder.embed_texts(chunks)
     logger.info(f"Embedded {len(chunks)} chunks")
-    return embeddings.tolist()  # Chroma expects plain lists, not numpy arrays 
+    return embeddings 
 
 def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filename: str):
     """
