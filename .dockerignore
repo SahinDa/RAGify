@@ -1,7 +1,36 @@
+# Environment files & secrets
 .env
+.env.*
+*.env
+
+# Virtual environments
 .venv/
 venv/
+env/
+
+# Bytecode & Python caches
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Git & IDE configs
 .git/
+.gitignore
 .vscode/
+.idea/
+
+# Local databases & storage
 chroma_db/
+*.db
+*.sqlite3
+
+# Test & coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs & Dockerfiles
+*.log
+Dockerfile*
+docker-compose*.yml
+README.md
