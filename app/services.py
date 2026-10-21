@@ -104,7 +104,7 @@ class GeminiReranker:
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-3.8-flash",
                 contents=prompt,
                 config={"response_mime_type": "application/json"},
             )
