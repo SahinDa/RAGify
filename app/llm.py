@@ -256,7 +256,7 @@ async def contextualize_query(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(NVIDIA_URL, headers=headers, json=payload)
             response.raise_for_status()
             data = response.json()
