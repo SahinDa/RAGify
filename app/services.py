@@ -39,14 +39,12 @@ class GeminiEmbedder:
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         all_embeddings = []
-        batch_size = 50
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
+        for text in texts:
             response = self.client.models.embed_content(
                 model=self.model_name,
-                contents=batch,
+                contents=text,
             )
-            all_embeddings.extend([e.values for e in response.embeddings])
+            all_embeddings.append(response.embeddings[0].values)
         return all_embeddings
 
     def embed_query(self, query: str) -> list[float]:
@@ -79,9 +77,9 @@ class DevReranker:
 
 
 class GeminiReranker:
-    """Listwise Reranking using gemini-3.8-flash (Zero extra RAM)."""
+    """Listwise Reranking using gemini-3.5-flash-lite (Zero extra RAM)."""
     def __init__(self):
-        logger.info("[PROD] Initializing Gemini API Reranker ('gemini-3.8-flash')...")
+        logger.info("[PROD] Initializing Gemini API Reranker ('gemini-3.5-flash-lite')...")
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is not set.")
         from google import genai
@@ -104,7 +102,7 @@ class GeminiReranker:
 
         try:
             response = self.client.models.generate_content(
-                model="gemini-3.8-flash",
+                model="gemini-3.5-flash-lite",
                 contents=prompt,
                 config={"response_mime_type": "application/json"},
             )
