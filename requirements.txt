@@ -1,24 +1,24 @@
 # Web Framework & Server
-fastapi==0.141.1
-uvicorn==0.52.1
-python-multipart==0.0.32
+fastapi==0.115.6
+uvicorn==0.34.0
+python-multipart==0.0.20
 
 # Async HTTP & Network
 httpx==0.28.1
-aiohttp==3.14.3
+aiohttp==3.11.11
 
 # Configuration & Environment
-pydantic==2.13.4
-pydantic-settings==2.14.2
-python-dotenv==1.2.2
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
 
 # Document Parsing
-pypdf==6.14.2
-python-docx==1.2.0
+pypdf==5.1.0
+python-docx==1.1.2
 
 # Databases
-chromadb==1.5.9
-asyncpg
+chromadb==0.6.3
+asyncpg==0.30.0
 
 # Google Gemini API SDK
-google-genai
+google-genai>=0.1.1

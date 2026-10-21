@@ -42,7 +42,7 @@ class GeminiEmbedder:
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
             response = self.client.models.embed_content(
-                model="text-embedding-004",
+                model="gemini-embedding-001",
                 contents=batch,
             )
             all_embeddings.extend([e.values for e in response.embeddings])
