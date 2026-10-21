@@ -30,7 +30,8 @@ class DevEmbedder:
 class GeminiEmbedder:
     """Production Google Gemini API (text-embedding-004, 768 dimensions)."""
     def __init__(self):
-        logger.info("[PROD] Initializing Gemini API Embedder ('text-embedding-004')...")
+        self.model_name = "gemini-embedding-001"
+        logger.info("[PROD] Initializing Gemini API Embedder ('{self.model_name}')...")
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is not set.")
         from google import genai
@@ -42,7 +43,7 @@ class GeminiEmbedder:
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
             response = self.client.models.embed_content(
-                model="gemini-embedding-001",
+                model=self.model_name,
                 contents=batch,
             )
             all_embeddings.extend([e.values for e in response.embeddings])
@@ -50,7 +51,7 @@ class GeminiEmbedder:
 
     def embed_query(self, query: str) -> list[float]:
         response = self.client.models.embed_content(
-            model="text-embedding-004",
+            model=self.model_name,
             contents=query,
         )
         return response.embeddings[0].values
