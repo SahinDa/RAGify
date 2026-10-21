@@ -89,7 +89,7 @@ async def _call_gemini_stream(messages: list[dict]):
     try:
         response = await asyncio.to_thread(
             gemini_client.models.generate_content_stream,
-            model="gemini-2.0-flash",
+            model="gemini-3.8-flash",
             contents=contents,
             config=config,
         )
@@ -224,7 +224,7 @@ async def contextualize_query(
         try:
             response = await asyncio.to_thread(
                 gemini_client.models.generate_content,
-                model="gemini-2.0-flash",
+                model="gemini-3.8-flash",
                 contents=user_prompt,
                 config={
                     "system_instruction": system_prompt,

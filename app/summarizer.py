@@ -23,7 +23,7 @@ async def _generate_summary_prod(system_prompt: str, user_prompt: str) -> str:
     """Generates summary using Gemini 2.0 Flash in production."""
     response = await asyncio.to_thread(
         gemini_client.models.generate_content,
-        model="gemini-2.0-flash",
+        model="gemini-3.8-flash",
         contents=user_prompt,
         config={
             "system_instruction": system_prompt,

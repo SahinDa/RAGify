@@ -79,9 +79,9 @@ class DevReranker:
 
 
 class GeminiReranker:
-    """Listwise Reranking using Gemini 2.0 Flash (Zero extra RAM)."""
+    """Listwise Reranking using gemini-3.8-flash (Zero extra RAM)."""
     def __init__(self):
-        logger.info("[PROD] Initializing Gemini API Reranker ('gemini-2.0-flash')...")
+        logger.info("[PROD] Initializing Gemini API Reranker ('gemini-3.8-flash')...")
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is not set.")
         from google import genai
