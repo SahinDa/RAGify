@@ -9,7 +9,7 @@ from app.env_check import validate_env
 setup_logging()
 validate_env()
 
-from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks ,File, Request
 from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
 import httpx
 from app.retrieval import retrieve_relevant_chunks
@@ -20,10 +20,23 @@ from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from app.memory import conversation_memory
 from app.summarizer import trigger_summarization_if_needed
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 
 
 app = FastAPI(title="RAGify")
+
+def get_real_ip(request: Request) -> str:
+    """Extract real client IP, respecting Render's reverse proxy headers."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+limiter = Limiter(key_func=get_real_ip)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +47,8 @@ async def serve_frontend():
     return FileResponse("static/index.html")
 
 @app.post("/upload")
-async def upload_file(file: UploadFile):
+@limiter.limit("5/minute")
+async def upload_file(request: Request, file: UploadFile):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided.")
     
@@ -79,7 +93,9 @@ async def upload_file(file: UploadFile):
     }
 
 @app.post("/ask")
+@limiter.limit("15/minute")
 async def ask_question(
+    request: Request,
     question: str,
     conversation_id: str,
     background_tasks: BackgroundTasks
@@ -165,7 +181,9 @@ async def ask_question(
 
 
 @app.post("/ask/stream")
+@limiter.limit("15/minute")
 async def ask_question_stream(
+    request: Request,
     question: str,
     conversation_id: str,
     background_tasks: BackgroundTasks
@@ -238,7 +256,8 @@ async def ask_question_stream(
     return StreamingResponse(generate(), media_type="text/plain")   
 
 @app.get("/memory/{conversation_id}/summary")
-async def get_summary(conversation_id: str):
+@limiter.limit("30/minute")
+async def get_summary(request: Request,conversation_id: str):
     """
     Returns the current rolling summary and turn metadata for a given conversation.
     """
