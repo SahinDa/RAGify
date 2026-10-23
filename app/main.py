@@ -9,7 +9,7 @@ from app.env_check import validate_env
 setup_logging()
 validate_env()
 
-from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks ,File, Request
+from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks, Request,status
 from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
 import httpx
 from app.retrieval import retrieve_relevant_chunks
@@ -267,3 +267,12 @@ async def get_summary(request: Request,conversation_id: str):
         "summary": context["summary"],
         "turn_count": len(context["recent_turns"]),
     } 
+
+@app.get("/health", status_code=status.HTTP_200_OK)
+async def health_check():
+    """Keep-alive ping endpoint for uptime monitors and external cron jobs."""
+    return {
+        "statuscode":200,
+        "status": "healthy",
+        "message": "RAGify service is up and running"
+    }
