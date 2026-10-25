@@ -23,7 +23,14 @@ from app.summarizer import trigger_summarization_if_needed
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+# Import your database session and models
+from app.db.database import get_db
+from app.db.models import User, UserRole
 
+# Import auth utilities directly from your new app/auth package
+from app.auth.schemas import UserSignUp, UserLogin, UserResponse, TokenResponse
+from app.auth.security import hash_password, verify_password, create_access_token
+from app.auth.deps import get_current_user
 
 app = FastAPI(title="RAGify")
 
@@ -276,3 +283,44 @@ async def health_check():
         "status": "healthy",
         "message": "RAGify service is up and running"
     }
+
+@router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def signup(data: UserSignUp, db: Session = Depends(get_db)):
+    """Register a new user account."""
+    existing_user = db.query(User).filter(User.email == data.email.lower()).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account with this email already exists",
+        )
+
+    new_user = User(
+        email=data.email.lower(),
+        hashed_password=hash_password(data.password),
+        role=UserRole.USER,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(credentials: UserLogin, db: Session = Depends(get_db)):
+    """Authenticate credentials and issue a signed JWT access token."""
+    user = db.query(User).filter(User.email == credentials.email.lower()).first()
+    if not user or not verify_password(credentials.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = create_access_token(data={"sub": user.id, "role": user.role.value})
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    """Retrieve details for the currently authenticated user."""
+    return current_user    
