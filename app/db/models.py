@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 from sqlalchemy import Column, String, DateTime, Enum as SQLEnum
-from app.database import Base  # or declarative_base()
+from app.db.database import Base  # or declarative_base()
 
 
 class UserRole(str, Enum):
@@ -24,3 +24,5 @@ class User(Base):
         nullable=False,
     )
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+from app.db.models import UserRole    

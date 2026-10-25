@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
-from app.models import UserRole
+from app.db.models import UserRole
 
 
 class UserSignUp(BaseModel):
