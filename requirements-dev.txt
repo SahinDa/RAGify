@@ -103,3 +103,7 @@ asyncpg
 slowapi
 sqlalchemy>=2.0.0
 psycopg2-binary>=2.9.9
+# Security & Auth
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3.0
+pydantic[email]>=2.0.0
