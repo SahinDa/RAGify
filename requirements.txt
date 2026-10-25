@@ -25,3 +25,7 @@ google-genai>=0.1.1
 
 #Rate Limiting
 slowapi
+
+# Database: ORM for models/queries and PostgreSQL binary driver
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
