@@ -62,7 +62,16 @@ function toggleAuthMode() {
   }
 }
 
-async function submitAuth() {
+function handleAuthKey(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    submitAuth(e);
+  }
+}
+
+async function submitAuth(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
   const email = document.getElementById("authEmail").value.trim();
   const password = document.getElementById("authPassword").value;
   const errorEl = document.getElementById("authError");
@@ -115,24 +124,66 @@ async function submitAuth() {
       throw new Error(data.detail || "Authentication request failed.");
     }
 
-    // If backend returns access_token immediately on signup
-    if (data.access_token) {
-      localStorage.setItem("ragify_token", data.access_token);
-      await checkSession();
-      closeAuthModal();
-    } else {
-      // Fallback: switch to login mode if signup only returned user details
-      isLoginMode = true;
-      toggleAuthMode();
-      document.getElementById("authEmail").value = email;
-      document.getElementById("authPassword").value = password;
-      await submitAuth();
-    }
+    // 1. Store token
+    localStorage.setItem("ragify_token", data.access_token);
+
+    // 2. Hydrate UI directly from response (No /auth/me call)
+    setLoggedInState(data.user);
+
+    // 3. Dismiss modal
+    closeAuthModal();
   } catch (err) {
     errorEl.textContent = err.message;
   } finally {
     btn.disabled = false;
     btn.textContent = isLoginMode ? "Sign In" : "Sign Up";
+  }
+}
+
+async function handleLogout() {
+  const token = localStorage.getItem("ragify_token");
+
+  // Call the backend logout route if a token exists
+  if (token) {
+    try {
+      await fetch("/auth/logout", {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+    } catch (err) {
+      console.warn("Logout request failed:", err);
+    }
+  }
+
+  // Clear local session and update UI
+  localStorage.removeItem("ragify_token");
+  setLoggedOutState();
+
+  if (typeof resetConversation === "function") {
+    resetConversation();
+  }
+}
+async function handleLogout() {
+  const token = localStorage.getItem("ragify_token");
+
+  // Call the backend logout route if a token exists
+  if (token) {
+    try {
+      await fetch("/auth/logout", {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+    } catch (err) {
+      console.warn("Logout request failed:", err);
+    }
+  }
+
+  // Clear local session and update UI
+  localStorage.removeItem("ragify_token");
+  setLoggedOutState();
+
+  if (typeof resetConversation === "function") {
+    resetConversation();
   }
 }
 

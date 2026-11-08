@@ -27,11 +27,12 @@
 
         <div class="header-actions">
             <!-- Sign In Button (Visible when logged out) -->
-            <button class="btn-header btn-primary" id="authBtn" onclick="openAuthModal()">Sign In</button>
+            <button type="button" class="btn-header btn-primary" id="authBtn" onclick="openAuthModal()">Sign In</button>
 
             <!-- Profile Dropdown Section (Visible when logged in) -->
             <div class="profile-container" id="profileContainer">
-                <button class="profile-trigger" id="profileTrigger" onclick="toggleProfileDropdown(event)">
+                <button type="button" class="profile-trigger" id="profileTrigger"
+                    onclick="toggleProfileDropdown(event)">
                     <div class="avatar-circle" id="userAvatar">U</div>
                     <span id="headerUserName">User</span>
                     <span style="font-size: 0.7rem; opacity: 0.6;">▼</span>
@@ -44,18 +45,18 @@
                             <span class="user-role-badge" id="dropdownRoleBadge">USER</span>
                         </div>
                     </div>
-                    <button class="dropdown-item danger" onclick="handleLogout()">
+                    <button type="button" class="dropdown-item danger" onclick="handleLogout()">
                         <span>🚪</span>
                         <span>Sign Out</span>
                     </button>
                 </div>
             </div>
 
-            <button class="btn-header" onclick="toggleTheme()">
+            <button type="button" class="btn-header" onclick="toggleTheme()">
                 <span id="themeIcon">🌙</span>
                 <span id="themeLabel">Dark</span>
             </button>
-            <button class="btn-header btn-danger" onclick="resetConversation()">Clear Chat</button>
+            <button type="button" class="btn-header btn-danger" onclick="resetConversation()">Clear Chat</button>
         </div>
     </header>
 
@@ -84,7 +85,7 @@
                 <textarea id="questionInput" class="input-box" rows="1"
                     placeholder="Ask a question across your documents..." oninput="autoResize(this)"
                     onkeydown="handleKey(event)"></textarea>
-                <button class="btn-send" id="submitBtn" onclick="submitQuery()">Send</button>
+                <button type="button" class="btn-send" id="submitBtn" onclick="submitQuery()">Send</button>
             </div>
             <div class="meta-strip">
                 <label class="stream-toggle">
@@ -101,7 +102,7 @@
         <div class="auth-card" onclick="event.stopPropagation()">
             <div class="auth-header">
                 <h2 class="auth-title" id="authModalTitle">Sign In</h2>
-                <button class="btn-close" onclick="closeAuthModal()" aria-label="Close dialog">×</button>
+                <button type="button" class="btn-close" onclick="closeAuthModal()" aria-label="Close dialog">×</button>
             </div>
 
             <div class="auth-error" id="authError"></div>
@@ -110,30 +111,35 @@
             <div id="signupNameFields" style="display: none; gap: 10px; width: 100%; box-sizing: border-box;">
                 <div class="auth-field" style="flex: 1; min-width: 0;">
                     <label for="authFirstName">First Name</label>
-                    <input class="auth-input" type="text" id="authFirstName" placeholder="John" />
+                    <input class="auth-input" type="text" id="authFirstName" placeholder="John"
+                        onkeydown="handleAuthKey(event)" />
                 </div>
                 <div class="auth-field" style="flex: 1; min-width: 0;">
                     <label for="authLastName">Last Name</label>
-                    <input class="auth-input" type="text" id="authLastName" placeholder="Doe" />
+                    <input class="auth-input" type="text" id="authLastName" placeholder="Doe"
+                        onkeydown="handleAuthKey(event)" />
                 </div>
             </div>
 
             <div class="auth-field">
                 <label for="authEmail">Email</label>
-                <input class="auth-input" type="email" id="authEmail" placeholder="you@domain.com" />
+                <input class="auth-input" type="email" id="authEmail" placeholder="you@domain.com"
+                    onkeydown="handleAuthKey(event)" />
             </div>
 
             <div class="auth-field">
                 <label for="authPassword">Password</label>
-                <input class="auth-input" type="password" id="authPassword" placeholder="••••••••" />
+                <input class="auth-input" type="password" id="authPassword" placeholder="••••••••"
+                    onkeydown="handleAuthKey(event)" />
             </div>
 
             <div class="auth-field" id="confirmPasswordField" style="display: none;">
                 <label for="authConfirmPassword">Confirm Password</label>
-                <input class="auth-input" type="password" id="authConfirmPassword" placeholder="••••••••" />
+                <input class="auth-input" type="password" id="authConfirmPassword" placeholder="••••••••"
+                    onkeydown="handleAuthKey(event)" />
             </div>
 
-            <button class="btn-send" id="authSubmitBtn" onclick="submitAuth()">Sign In</button>
+            <button type="button" class="btn-send" id="authSubmitBtn" onclick="submitAuth(event)">Sign In</button>
 
             <div class="auth-toggle-link" id="authToggleText" onclick="toggleAuthMode()">
                 Don't have an account? Sign Up
@@ -141,10 +147,10 @@
         </div>
     </div>
 
-    <!-- Modular Application Scripts -->
-    <script src="/static/js/auth.js"></script>
-    <script src="/static/js/upload.js"></script>
-    <script src="/static/js/chat.js"></script>
+    <!-- Modular Application Scripts with Cache-Busting Parameters -->
+    <script src="/static/js/auth.js?v=1.1"></script>
+    <script src="/static/js/upload.js?v=1.1"></script>
+    <script src="/static/js/chat.js?v=1.1"></script>
 </body>
 
 </html>
