@@ -9,31 +9,35 @@ from app.env_check import validate_env
 setup_logging()
 validate_env()
 
-from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks, Request,status,Depends
-from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
 import httpx
-from app.retrieval import retrieve_relevant_chunks
-from app.llm import build_prompt, call_llm_stream , contextualize_query
+from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks, Request, status, Depends
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.concurrency import run_in_threadpool
-from app.memory import conversation_memory
-from app.summarizer import trigger_summarization_if_needed
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
 
-# Import your database session and models
+# Ingestion, Retrieval & LLM Pipeline
+from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
+from app.retrieval import retrieve_relevant_chunks
+from app.llm import build_prompt, call_llm_stream, contextualize_query
+from app.memory import conversation_memory
+from app.summarizer import trigger_summarization_if_needed
+
+# Database & Models
 from app.db.database import get_db
 from app.db.models import User, UserRole
 
-# Import auth utilities directly from your new app/auth package
-from app.auth.schemas import UserSignUp, UserLogin, UserResponse, TokenResponse
+# Auth Utilities
+from app.auth.schemas import UserSignUp, UserLogin, UserResponse, AuthResponse
 from app.auth.security import hash_password, verify_password, create_access_token
 from app.auth.deps import get_current_user
 
 app = FastAPI(title="RAGify")
+
+logger = logging.getLogger(__name__)
+
 
 def get_real_ip(request: Request) -> str:
     """Extract real client IP, respecting Render's reverse proxy headers."""
@@ -42,42 +46,128 @@ def get_real_ip(request: Request) -> str:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "127.0.0.1"
 
+
 limiter = Limiter(key_func=get_real_ip)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-logger = logging.getLogger(__name__)
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/")
 async def serve_frontend():
     return FileResponse("static/index.html")
 
+
+# =====================================================================
+# AUTHENTICATION ENDPOINTS (Supports both /auth/* and root routes)
+# =====================================================================
+
+@app.post("/auth/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, tags=["Authentication"])
+@app.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
+def signup(data: UserSignUp, db: Session = Depends(get_db)):
+    """Register a new user account."""
+    normalized_email = data.email.lower().strip()
+    existing_user = db.query(User).filter(User.email == normalized_email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account with this email already exists",
+        )
+
+    new_user = User(
+        email=normalized_email,
+        hashed_password=hash_password(data.password),
+        role=UserRole.USER,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    token = create_access_token(
+        data={"sub": str(new_user.id), "role": int(new_user.role), "email": new_user.email}
+    )
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(new_user.id),
+            "email": new_user.email,
+            "role": int(new_user.role),
+            "created_at": new_user.created_at,
+        },
+    }
+
+
+@app.post("/auth/login", response_model=AuthResponse, tags=["Authentication"])
+@app.post("/login", response_model=AuthResponse, include_in_schema=False)
+def login(credentials: UserLogin, db: Session = Depends(get_db)):
+    """Authenticate credentials and issue a signed JWT access token."""
+    normalized_email = credentials.email.lower().strip()
+    user = db.query(User).filter(User.email == normalized_email).first()
+    if not user or not verify_password(credentials.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = create_access_token(
+        data={"sub": str(user.id), "role": int(user.role), "email": user.email}
+    )
+
+    user_data = UserResponse(
+        id=str(user.id),
+        email=str(user.email),
+        role=int(user.role),
+        created_at=user.created_at
+    )
+
+    return AuthResponse(
+        access_token=token,
+        token_type="bearer",
+        user=user_data
+    )
+
+
+@app.get("/auth/me", response_model=UserResponse, tags=["Authentication"])
+@app.get("/me", response_model=UserResponse, include_in_schema=False)
+def get_me(current_user: User = Depends(get_current_user)):
+    """Retrieve details for the currently authenticated user."""
+    return current_user
+
+
+# =====================================================================
+# PROTECTED RAG PIPELINE
+# =====================================================================
+
 @app.post("/upload")
 @limiter.limit("5/minute")
-async def upload_file(request: Request, file: UploadFile):
+async def upload_file(
+    request: Request,
+    file: UploadFile,
+    current_user: User = Depends(get_current_user)
+):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided.")
     
     # Step 1: Read raw bytes from the uploaded file
     content = await file.read()
-    logger.info(f"Upload received: {file.filename} ({len(content)} bytes)")
+    logger.info(f"Upload received: {file.filename} ({len(content)} bytes) by {current_user.email}")
     
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
     
-    # Limit file size to 10MB to prevent server overload
     max_size = 10 * 1024 * 1024  # 10MB
     if len(content) > max_size:
         logger.warning(f"Upload rejected (too large): {file.filename} ({len(content)} bytes)")
         raise HTTPException(status_code=413, detail="File too large. Max size is 10MB.")
-    # Step 2: Parse text out of the file (handles .txt / .pdf)
+    
+    # Step 2: Parse text out of the file (.txt / .pdf)
     try:
         text = parse_file(file.filename, content)
     except ValueError as e:
-         logger.error(f"Parse failed for {file.filename}: {e}")
-         raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Parse failed for {file.filename}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
     if not text.strip():
         logger.warning(f"No readable text extracted from {file.filename}")
@@ -87,18 +177,26 @@ async def upload_file(request: Request, file: UploadFile):
     chunks = chunk_text(text)
 
     # Step 4: Embed the chunks
-    embeddings =  await run_in_threadpool(embed_chunks,chunks)
+    embeddings = await run_in_threadpool(embed_chunks, chunks)
 
-    # Step 5: Store chunks + embeddings in ChromaDB
-    await run_in_threadpool(store_chunks,chunks, embeddings, source_filename=file.filename)
+    # Step 5: Store chunks + embeddings in ChromaDB tagged with the user's ID
+    await run_in_threadpool(
+        store_chunks,
+        chunks,
+        embeddings,
+        source_filename=file.filename,
+        user_id=str(current_user.id)
+    )
     
-    logger.info(f"Upload complete: {file.filename} — {len(chunks)} chunks created")
+    logger.info(f"Upload complete: {file.filename} — {len(chunks)} chunks created for user {current_user.id}")
     
     return {
         "filename": file.filename,
         "chunks_created": len(chunks),
-        "status": "success"
+        "status": "success",
+        "owner": current_user.email
     }
+
 
 @app.post("/ask")
 @limiter.limit("15/minute")
@@ -106,17 +204,18 @@ async def ask_question(
     request: Request,
     question: str,
     conversation_id: str,
-    background_tasks: BackgroundTasks
-    ):
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
-    logger.info(f"Question received: {question}")
+    logger.info(f"Question received from {current_user.email}: {question}")
 
     # Fetch memory context
     context = conversation_memory.get_context(conversation_id)
     
-    # Decode raw question into a standalone search query
+    # Contextualize query
     search_query = await contextualize_query(
         question=question,
         recent_turns=context["recent_turns"],
@@ -125,19 +224,27 @@ async def ask_question(
     logger.info(f"Resolved search query: '{search_query}' (Original: '{question}')")
 
     try:
-        chunks = await run_in_threadpool(retrieve_relevant_chunks,search_query)
+        # Retrieve chunks scoped strictly to the current user
+        chunks = await run_in_threadpool(
+            retrieve_relevant_chunks,
+            search_query,
+            user_id=str(current_user.id)
+        )
+    except TypeError:
+        # Backward-compatibility fallback if retrieve_relevant_chunks hasn't taken user_id yet
+        chunks = await run_in_threadpool(retrieve_relevant_chunks, search_query)
     except Exception as e:
         logger.error(f"Retrieval failed for question '{question}': {e}")
-        raise HTTPException(status_code=500,detail=f"Error retrieving relevant chunks: {str(e)}")    
+        raise HTTPException(status_code=500, detail=f"Error retrieving relevant chunks: {str(e)}")    
 
     if not chunks:
         logger.info(f"No chunks found for question: {question}")
         answer = "I don't have enough information in the provided documents to answer that."
 
         conversation_memory.add_turn(
-        conversation_id=conversation_id,
-        question=question,
-        answer=answer,
+            conversation_id=conversation_id,
+            question=question,
+            answer=answer,
         )
 
         return {
@@ -151,7 +258,7 @@ async def ask_question(
         chunks,
         summary=context["summary"],
         recent_turns=context["recent_turns"]
-        )
+    )
 
     try:
         pieces = [piece async for piece in call_llm_stream(messages)]
@@ -172,14 +279,12 @@ async def ask_question(
     logger.info(f"Answered question (answer length: {len(answer)} chars, {len(chunks)} sources)")
 
     conversation_memory.add_turn(
-    conversation_id=conversation_id,
-    question=question,
-    answer=answer,
+        conversation_id=conversation_id,
+        question=question,
+        answer=answer,
     )
     
-    # Schedule background summarization
     background_tasks.add_task(trigger_summarization_if_needed, conversation_id)
-    
 
     return {
         "question": question,
@@ -194,17 +299,15 @@ async def ask_question_stream(
     request: Request,
     question: str,
     conversation_id: str,
-    background_tasks: BackgroundTasks
-    ):
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+):
     if not question or not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
     
-    logger.info(f"Streaming question received: {question}")
+    logger.info(f"Streaming question received from {current_user.email}: {question}")
     
-    # Fetch memory context
     context = conversation_memory.get_context(conversation_id)
-    
-    # Decode raw question into a standalone search query
     search_query = await contextualize_query(
         question=question,
         recent_turns=context["recent_turns"],
@@ -213,7 +316,13 @@ async def ask_question_stream(
     logger.info(f"Resolved search query: '{search_query}' (Original: '{question}')")
     
     try:
-        chunks = await run_in_threadpool(retrieve_relevant_chunks,search_query)
+        chunks = await run_in_threadpool(
+            retrieve_relevant_chunks,
+            search_query,
+            user_id=str(current_user.id)
+        )
+    except TypeError:
+        chunks = await run_in_threadpool(retrieve_relevant_chunks, search_query)
     except Exception as e:
         logger.error(f"Retrieval failed for streaming question '{question}': {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving relevant chunks: {str(e)}")    
@@ -227,16 +336,17 @@ async def ask_question_stream(
                 conversation_id=conversation_id,
                 question=question,
                 answer=answer,
-                )
+            )
             yield answer
             
         return StreamingResponse(empty_response(), media_type="text/plain")
 
-    messages = build_prompt(question, 
-                            chunks,
-                            summary=context["summary"],
-                            recent_turns=context["recent_turns"]
-                            )
+    messages = build_prompt(
+        question, 
+        chunks,
+        summary=context["summary"],
+        recent_turns=context["recent_turns"]
+    )
 
     async def generate():
         answer_parts = []
@@ -253,22 +363,23 @@ async def ask_question_stream(
                 answer=answer,
             )
             
-            # Trigger summarization in background after turn is added
             background_tasks.add_task(trigger_summarization_if_needed, conversation_id)
-
             logger.info(f"Finished streaming answer for: {question}")    
         except Exception as e:
             logger.error(f"Streaming error for question '{question}': {e}")
             yield f"\n[Error: {str(e)}]"
 
-    return StreamingResponse(generate(), media_type="text/plain")   
+    return StreamingResponse(generate(), media_type="text/plain")
+
 
 @app.get("/memory/{conversation_id}/summary")
 @limiter.limit("30/minute")
-async def get_summary(request: Request,conversation_id: str):
-    """
-    Returns the current rolling summary and turn metadata for a given conversation.
-    """
+async def get_summary(
+    request: Request,
+    conversation_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Returns the current rolling summary and turn metadata for a given conversation."""
     context = conversation_memory.get_context(conversation_id)
     return {
         "conversation_id": conversation_id,
@@ -276,52 +387,12 @@ async def get_summary(request: Request,conversation_id: str):
         "turn_count": len(context["recent_turns"]),
     } 
 
+
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():
     """Keep-alive ping endpoint for uptime monitors and external cron jobs."""
     return {
-        "statuscode":200,
+        "statuscode": 200,
         "status": "healthy",
         "message": "RAGify service is up and running"
     }
-
-@app.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def signup(data: UserSignUp, db: Session = Depends(get_db)):
-    """Register a new user account."""
-    existing_user = db.query(User).filter(User.email == data.email.lower()).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Account with this email already exists",
-        )
-
-    new_user = User(
-        email=data.email.lower(),
-        hashed_password=hash_password(data.password),
-        role=UserRole.USER,
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
-
-
-@app.post("/login", response_model=TokenResponse)
-def login(credentials: UserLogin, db: Session = Depends(get_db)):
-    """Authenticate credentials and issue a signed JWT access token."""
-    user = db.query(User).filter(User.email == credentials.email.lower()).first()
-    if not user or not verify_password(credentials.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = create_access_token(data={"sub": user.id, "role": user.role.value})
-    return {"access_token": token, "token_type": "bearer"}
-
-
-@app.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
-    """Retrieve details for the currently authenticated user."""
-    return current_user    

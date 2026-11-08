@@ -1,5 +1,5 @@
 from app.auth.security import hash_password, verify_password, create_access_token, decode_access_token
-from app.auth.schemas import UserSignUp, UserLogin, UserResponse, TokenResponse
+from app.auth.schemas import UserSignUp, UserLogin, UserResponse, AuthResponse
 from app.auth.deps import get_current_user, require_admin
 
 __all__ = [
@@ -10,7 +10,7 @@ __all__ = [
     "UserSignUp",
     "UserLogin",
     "UserResponse",
-    "TokenResponse",
+    "AuthResponse",
     "get_current_user",
     "require_admin",
 ]
