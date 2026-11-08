@@ -128,6 +128,15 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
         user=user_data
     )
 
+# =====================================================================
+# AUTHENTICATION ENDPOINTS
+# =====================================================================
+
+@app.post("/auth/logout", status_code=status.HTTP_200_OK, tags=["Authentication"])
+@app.post("/logout", status_code=status.HTTP_200_OK, include_in_schema=False)
+def logout(current_user: User = Depends(get_current_user)):
+    """Terminate the current user session."""
+    return {"message": "Successfully logged out", "status": "success"}
 
 @app.get("/auth/me", response_model=UserResponse, tags=["Authentication"])
 @app.get("/me", response_model=UserResponse, include_in_schema=False)
