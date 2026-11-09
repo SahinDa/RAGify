@@ -10,7 +10,7 @@ setup_logging()
 validate_env()
 
 import httpx
-from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks, Request, status, Depends
+from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks, Request, status, Depends,Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.concurrency import run_in_threadpool
@@ -38,6 +38,7 @@ app = FastAPI(title="RAGify")
 
 logger = logging.getLogger(__name__)
 
+COOKIE_MAX_AGE = 24 * 60 * 60
 
 def get_real_ip(request: Request) -> str:
     """Extract real client IP, respecting Render's reverse proxy headers."""
@@ -65,7 +66,7 @@ async def serve_frontend():
 
 @app.post("/auth/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, tags=["Authentication"])
 @app.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
-def signup(data: UserSignUp, db: Session = Depends(get_db)):
+def signup(data: UserSignUp,response: Response, db: Session = Depends(get_db)):
     """Register a new user account."""
     normalized_email = data.email.lower().strip()
     existing_user = db.query(User).filter(User.email == normalized_email).first()
@@ -86,21 +87,35 @@ def signup(data: UserSignUp, db: Session = Depends(get_db)):
     token = create_access_token(
         data={"sub": str(new_user.id), "role": int(new_user.role), "email": new_user.email}
     )
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {
-            "id": str(new_user.id),
-            "email": new_user.email,
-            "role": int(new_user.role),
-            "created_at": new_user.created_at,
-        },
-    }
+    
+    response.set_cookie(
+        key="ragify_token",
+        value=token,
+        max_age=COOKIE_MAX_AGE,
+        expires=COOKIE_MAX_AGE,
+        httponly=False,  # Allow frontend fallback read if needed
+        samesite="lax",
+        secure=False,    # Set to True when deployed with HTTPS
+        path="/"
+    )
+    return AuthResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_in=COOKIE_MAX_AGE,
+        user=UserResponse(
+            id=str(new_user.id),
+            email=new_user.email,
+            first_name=new_user.first_name,
+            last_name=new_user.last_name,
+            role=int(new_user.role),
+            created_at=new_user.created_at,
+        ),
+    )
 
 
 @app.post("/auth/login", response_model=AuthResponse, tags=["Authentication"])
 @app.post("/login", response_model=AuthResponse, include_in_schema=False)
-def login(credentials: UserLogin, db: Session = Depends(get_db)):
+def login(credentials: UserLogin,response: Response, db: Session = Depends(get_db)):
     """Authenticate credentials and issue a signed JWT access token."""
     normalized_email = credentials.email.lower().strip()
     user = db.query(User).filter(User.email == normalized_email).first()
@@ -115,17 +130,29 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
         data={"sub": str(user.id), "role": int(user.role), "email": user.email}
     )
 
-    user_data = UserResponse(
-        id=str(user.id),
-        email=str(user.email),
-        role=int(user.role),
-        created_at=user.created_at
+    response.set_cookie(
+        key="ragify_token",
+        value=token,
+        max_age=COOKIE_MAX_AGE,
+        expires=COOKIE_MAX_AGE,
+        httponly=False,
+        samesite="lax",
+        secure=False,
+        path="/"
     )
 
     return AuthResponse(
         access_token=token,
         token_type="bearer",
-        user=user_data
+        expires_in=COOKIE_MAX_AGE,
+        user=UserResponse(
+            id=str(user.id),
+            email=user.email,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            role=int(user.role),
+            created_at=user.created_at,
+        ),
     )
 
 # =====================================================================
@@ -134,15 +161,23 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
 
 @app.post("/auth/logout", status_code=status.HTTP_200_OK, tags=["Authentication"])
 @app.post("/logout", status_code=status.HTTP_200_OK, include_in_schema=False)
-def logout(current_user: User = Depends(get_current_user)):
+def logout(response: Response, current_user: User = Depends(get_current_user)):
     """Terminate the current user session."""
+    response.delete_cookie(key="ragify_token", path="/")
     return {"message": "Successfully logged out", "status": "success"}
 
 @app.get("/auth/me", response_model=UserResponse, tags=["Authentication"])
 @app.get("/me", response_model=UserResponse, include_in_schema=False)
 def get_me(current_user: User = Depends(get_current_user)):
-    """Retrieve details for the currently authenticated user."""
-    return current_user
+    """Retrieve details for active user session."""
+    return UserResponse(
+        id=str(current_user.id),
+        email=current_user.email,
+        first_name=current_user.first_name,
+        last_name=current_user.last_name,
+        role=int(current_user.role),
+        created_at=current_user.created_at,
+    )
 
 
 # =====================================================================

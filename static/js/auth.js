@@ -124,13 +124,9 @@ async function submitAuth(e) {
       throw new Error(data.detail || "Authentication request failed.");
     }
 
-    // 1. Store token
-    localStorage.setItem("ragify_token", data.access_token);
-
-    // 2. Hydrate UI directly from response (No /auth/me call)
+    // Browser automatically sets the 24h cookie via HTTP Set-Cookie header.
+    // Hydrate UI state directly from response payload:
     setLoggedInState(data.user);
-
-    // 3. Dismiss modal
     closeAuthModal();
   } catch (err) {
     errorEl.textContent = err.message;
@@ -188,19 +184,14 @@ async function handleLogout() {
 }
 
 async function checkSession() {
-  const token = localStorage.getItem("ragify_token");
-  if (!token) {
-    setLoggedOutState();
-    return;
-  }
-
   try {
-    const res = await fetch("/auth/me", { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error("Expired session");
+    // Browser automatically passes the cookie along with this request
+    const res = await fetch("/auth/me");
+    if (!res.ok) throw new Error("No active session");
     const user = await res.json();
     setLoggedInState(user);
   } catch {
-    handleLogout();
+    setLoggedOutState();
   }
 }
 
@@ -214,6 +205,11 @@ function setLoggedInState(user) {
   if (profileContainer) profileContainer.style.display = "block";
 
   const displayName = user.email.split("@")[0];
+  if (user.first_name) {
+    displayName = user.last_name
+      ? `${user.first_name} ${user.last_name}`
+      : user.first_name;
+  }
   const initial = displayName.charAt(0).toUpperCase();
   const roleName = user.role === 2 || user.role === "admin" ? "ADMIN" : "USER";
 
@@ -240,9 +236,18 @@ function setLoggedOutState() {
   if (dropdown) dropdown.classList.remove("open");
 }
 
-function handleLogout() {
-  localStorage.removeItem("ragify_token");
+async function handleLogout() {
+  if (e && e.stopPropagation) e.stopPropagation();
+
+  try {
+    // Calling backend logout tells the server to delete the cookie via response.delete_cookie()
+    await fetch("/auth/logout", { method: "POST" });
+  } catch (err) {
+    console.warn("Backend logout request failed:", err);
+  }
+
   setLoggedOutState();
+
   if (typeof resetConversation === "function") {
     resetConversation();
   }

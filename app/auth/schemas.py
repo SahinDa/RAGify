@@ -28,4 +28,5 @@ class UserResponse(BaseModel):
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    expires_in: int = 86400
     user: UserResponse

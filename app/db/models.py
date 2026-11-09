@@ -17,6 +17,8 @@ class User(Base):
     # Maps directly to your Neon table columns
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String(255), unique=True, nullable=False)
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
     hashed_password = Column(String(255), nullable=False)
     role = Column(Integer, default=UserRole.USER.value, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
