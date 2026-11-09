@@ -5,8 +5,10 @@ CREATE TYPE user_roles AS ENUM ('admin', 'user');
 CREATE TABLE users (
     id TEXT PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100),
     hashed_password VARCHAR(255) NOT NULL,
-    role user_roles DEFAULT 'user' NOT NULL,
+    role INTEGER DEFAULT 1 NOT NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 

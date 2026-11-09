@@ -75,12 +75,24 @@ def signup(data: UserSignUp,response: Response, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Account with this email already exists",
         )
+        
+    first_name = data.first_name.strip() if data.first_name else ""
+    if not first_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="First name cannot be empty."
+        )
+
+    last_name = data.last_name.strip() if data.last_name and data.last_name.strip() else None
 
     new_user = User(
         email=normalized_email,
         hashed_password=hash_password(data.password),
+        first_name=first_name,
+        last_name=last_name,
         role=UserRole.USER,
-    )
+    )      
+    
     db.add(new_user)
     db.commit()
     db.refresh(new_user)

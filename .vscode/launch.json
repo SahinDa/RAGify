@@ -1,17 +1,18 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "RAGify Debug",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "uvicorn",
-            "args": [
-                "app.main:app"
-            ],
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "justMyCode": true
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FastAPI: Debug",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--port",
+        "8000"
+      ],
+      "jinja": true,
+      "justMyCode": true
+    }
+  ]
 }
