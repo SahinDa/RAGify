@@ -7,21 +7,22 @@ from app.db.database import get_db
 from app.db.models import User, UserRole
 from app.auth.schemas import UserSignUp, UserLogin, UserResponse, AuthResponse
 from app.auth.security import hash_password, verify_password, create_access_token
-from app.auth.deps import get_current_user_or_guest, DemoUser
+from app.auth.deps import get_current_user, get_current_user_or_guest, DemoUser
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-COOKIE_MAX_AGE = 24 * 60 * 60  # 24 Hours
+COOKIE_MAX_AGE = 24 * 60 * 60
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
 
 
 def set_auth_cookie(response: Response, token: str) -> None:
+    """Helper to set consistent session cookies."""
     response.set_cookie(
         key="ragify_token",
         value=token,
         max_age=COOKIE_MAX_AGE,
         expires=COOKIE_MAX_AGE,
-        httponly=False,  # Set to False to permit frontend fallback inspection
+        httponly=False,
         samesite="lax",
         secure=IS_PRODUCTION,
         path="/",
@@ -36,7 +37,7 @@ def signup(data: UserSignUp, response: Response, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An account with this email already exists.",
+            detail="Account with this email already exists",
         )
 
     first_name = data.first_name.strip()
@@ -82,13 +83,13 @@ def signup(data: UserSignUp, response: Response, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=AuthResponse)
 def login(credentials: UserLogin, response: Response, db: Session = Depends(get_db)):
-    """Authenticate email & password and issue JWT session."""
+    """Authenticate credentials and issue a signed JWT access token."""
     normalized_email = credentials.email.lower().strip()
     user = db.query(User).filter(User.email == normalized_email).first()
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password.",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -113,31 +114,24 @@ def login(credentials: UserLogin, response: Response, db: Session = Depends(get_
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
-def logout(response: Response):
-    """Terminate user session and clear cookie."""
+def logout(response: Response, current_user: User = Depends(get_current_user)):
+    """Terminate the current user session."""
     response.delete_cookie(key="ragify_token", path="/")
     return {"message": "Successfully logged out", "status": "success"}
 
 
 @router.get("/me")
 def get_me(user=Depends(get_current_user_or_guest)):
-    """Returns active user session; returns is_demo: True for guests without 401 errors."""
+    """Retrieve details for active user session; returns DemoUser directly for guests."""
     if isinstance(user, DemoUser) or getattr(user, "is_demo", False):
         return {
             "authenticated": False,
             "is_demo": True,
-            "user": None
+            "user": user,
         }
 
     return {
         "authenticated": True,
         "is_demo": False,
-        "user": UserResponse(
-            id=str(user.id),
-            email=user.email,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            role=int(user.role),
-            created_at=user.created_at,
-        )
+        "user": UserResponse.model_validate(user),
     }
