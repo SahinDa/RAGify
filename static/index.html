@@ -29,23 +29,23 @@
             <!-- Sign In Button (Visible when logged out) -->
             <button type="button" class="btn-header btn-primary" id="authBtn" onclick="openAuthModal()">Sign In</button>
 
-            <!-- Profile Dropdown Section (Visible when logged in) -->
-            <div class="profile-container" id="profileContainer">
+            <!-- Profile Dropdown Section (Starts hidden; only revealed after auth verification) -->
+            <div class="profile-container" id="profileContainer" style="display: none;">
                 <button type="button" class="profile-trigger" id="profileTrigger"
                     onclick="toggleProfileDropdown(event)">
-                    <div class="avatar-circle" id="userAvatar">U</div>
-                    <span id="headerUserName">User</span>
+                    <div class="avatar-circle" id="userAvatar"></div>
+                    <span id="headerUserName"></span>
                     <span style="font-size: 0.7rem; opacity: 0.6;">▼</span>
                 </button>
 
                 <div class="profile-dropdown" id="profileDropdown" onclick="event.stopPropagation()">
                     <div class="dropdown-user-info">
-                        <span class="dropdown-email" id="dropdownEmail">user@domain.com</span>
+                        <span class="dropdown-email" id="dropdownEmail"></span>
                         <div>
-                            <span class="user-role-badge" id="dropdownRoleBadge">USER</span>
+                            <span class="user-role-badge" id="dropdownRoleBadge" style="display: none;"></span>
                         </div>
                     </div>
-                    <button type="button" class="dropdown-item danger" onclick="handleLogout()">
+                    <button type="button" class="dropdown-item danger" onclick="handleLogout(event)">
                         <span>🚪</span>
                         <span>Sign Out</span>
                     </button>
@@ -147,10 +147,10 @@
         </div>
     </div>
 
-    <!-- Modular Application Scripts with Cache-Busting Parameters -->
-    <script src="/static/js/auth.js?v=1.1"></script>
-    <script src="/static/js/upload.js?v=1.1"></script>
-    <script src="/static/js/chat.js?v=1.1"></script>
+    <!-- Application Scripts with Cache-Busting Version Query -->
+    <script src="/static/js/auth.js?v=2.0"></script>
+    <script src="/static/js/upload.js?v=2.0"></script>
+    <script src="/static/js/chat.js?v=2.0"></script>
 </body>
 
 </html>

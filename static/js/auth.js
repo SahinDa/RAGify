@@ -11,17 +11,27 @@ function openAuthModal() {
     handleLogout();
     return;
   }
-  document.getElementById("authError").textContent = "";
-  document.getElementById("authModal").classList.add("active");
-  document.getElementById("authEmail").focus();
+  const errorEl = document.getElementById("authError");
+  if (errorEl) errorEl.textContent = "";
+
+  const modal = document.getElementById("authModal");
+  if (modal) modal.classList.add("active");
+
+  const emailInput = document.getElementById("authEmail");
+  if (emailInput) emailInput.focus();
 }
 
 function closeAuthModal() {
-  document.getElementById("authModal").classList.remove("active");
+  const modal = document.getElementById("authModal");
+  if (modal) {
+    modal.classList.remove("active");
+  }
 }
 
-function handleOverlayClick() {
-  closeAuthModal();
+function handleOverlayClick(e) {
+  if (e && e.target && e.target.id === "authModal") {
+    closeAuthModal();
+  }
 }
 
 function toggleProfileDropdown(e) {
@@ -45,20 +55,20 @@ function toggleAuthMode() {
   const confirmPassField = document.getElementById("confirmPasswordField");
   const errorEl = document.getElementById("authError");
 
-  errorEl.textContent = "";
+  if (errorEl) errorEl.textContent = "";
 
   if (isLoginMode) {
-    modalTitle.textContent = "Sign In";
-    submitBtn.textContent = "Sign In";
-    toggleText.textContent = "Don't have an account? Sign Up";
-    nameFields.style.display = "none";
-    confirmPassField.style.display = "none";
+    if (modalTitle) modalTitle.textContent = "Sign In";
+    if (submitBtn) submitBtn.textContent = "Sign In";
+    if (toggleText) toggleText.textContent = "Don't have an account? Sign Up";
+    if (nameFields) nameFields.style.display = "none";
+    if (confirmPassField) confirmPassField.style.display = "none";
   } else {
-    modalTitle.textContent = "Create Account";
-    submitBtn.textContent = "Sign Up";
-    toggleText.textContent = "Already have an account? Sign In";
-    nameFields.style.display = "flex";
-    confirmPassField.style.display = "flex";
+    if (modalTitle) modalTitle.textContent = "Create Account";
+    if (submitBtn) submitBtn.textContent = "Sign Up";
+    if (toggleText) toggleText.textContent = "Already have an account? Sign In";
+    if (nameFields) nameFields.style.display = "flex";
+    if (confirmPassField) confirmPassField.style.display = "flex";
   }
 }
 
@@ -72,39 +82,46 @@ function handleAuthKey(e) {
 async function submitAuth(e) {
   if (e && e.preventDefault) e.preventDefault();
 
-  const email = document.getElementById("authEmail").value.trim();
-  const password = document.getElementById("authPassword").value;
+  const emailEl = document.getElementById("authEmail");
+  const passEl = document.getElementById("authPassword");
   const errorEl = document.getElementById("authError");
   const btn = document.getElementById("authSubmitBtn");
 
-  errorEl.textContent = "";
+  const email = emailEl ? emailEl.value.trim() : "";
+  const password = passEl ? passEl.value : "";
+
+  if (errorEl) errorEl.textContent = "";
 
   if (!email || !password) {
-    errorEl.textContent = "Please fill in all required fields.";
+    if (errorEl) errorEl.textContent = "Please fill in all required fields.";
     return;
   }
 
   let payload = { email, password };
 
   if (!isLoginMode) {
-    const firstName = document.getElementById("authFirstName").value.trim();
-    const lastName = document.getElementById("authLastName").value.trim();
-    const confirmPassword = document.getElementById(
-      "authConfirmPassword",
-    ).value;
+    const firstNameEl = document.getElementById("authFirstName");
+    const lastNameEl = document.getElementById("authLastName");
+    const confirmPassEl = document.getElementById("authConfirmPassword");
 
-    if (!firstName || !lastName) {
-      errorEl.textContent = "Please enter both your first and last name.";
+    const firstName = firstNameEl ? firstNameEl.value.trim() : "";
+    const lastName = lastNameEl ? lastNameEl.value.trim() : "";
+    const confirmPassword = confirmPassEl ? confirmPassEl.value : "";
+
+    if (!firstName) {
+      if (errorEl) errorEl.textContent = "Please enter your first name.";
       return;
     }
 
     if (password !== confirmPassword) {
-      errorEl.textContent = "Passwords do not match.";
+      if (errorEl) errorEl.textContent = "Passwords do not match.";
       return;
     }
 
     payload.first_name = firstName;
-    payload.last_name = lastName;
+    if (lastName) {
+      payload.last_name = lastName;
+    }
   }
 
   btn.disabled = true;
@@ -121,60 +138,46 @@ async function submitAuth(e) {
     const data = await res.json();
 
     if (!res.ok) {
-      throw new Error(data.detail || "Authentication request failed.");
+      let message = "Authentication failed.";
+      if (typeof data.detail === "string") {
+        message = data.detail;
+      } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+        message = data.detail[0].msg || JSON.stringify(data.detail[0]);
+      }
+      throw new Error(message);
     }
 
-    // Browser automatically sets the 24h cookie via HTTP Set-Cookie header.
-    // Hydrate UI state directly from response payload:
+    if (data.access_token) {
+      localStorage.setItem("ragify_token", data.access_token);
+    }
+
     setLoggedInState(data.user);
     closeAuthModal();
+
+    if (passEl) passEl.value = "";
+    const confirmPassEl = document.getElementById("authConfirmPassword");
+    if (confirmPassEl) confirmPassEl.value = "";
   } catch (err) {
-    errorEl.textContent = err.message;
+    if (errorEl) errorEl.textContent = err.message;
   } finally {
     btn.disabled = false;
     btn.textContent = isLoginMode ? "Sign In" : "Sign Up";
   }
 }
 
-async function handleLogout() {
-  const token = localStorage.getItem("ragify_token");
+async function handleLogout(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
 
-  // Call the backend logout route if a token exists
-  if (token) {
-    try {
-      await fetch("/auth/logout", {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
-    } catch (err) {
-      console.warn("Logout request failed:", err);
-    }
+  try {
+    await fetch("/auth/logout", {
+      method: "POST",
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+  } catch (err) {
+    console.warn("Backend logout request failed:", err);
   }
 
-  // Clear local session and update UI
-  localStorage.removeItem("ragify_token");
-  setLoggedOutState();
-
-  if (typeof resetConversation === "function") {
-    resetConversation();
-  }
-}
-async function handleLogout() {
-  const token = localStorage.getItem("ragify_token");
-
-  // Call the backend logout route if a token exists
-  if (token) {
-    try {
-      await fetch("/auth/logout", {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
-    } catch (err) {
-      console.warn("Logout request failed:", err);
-    }
-  }
-
-  // Clear local session and update UI
   localStorage.removeItem("ragify_token");
   setLoggedOutState();
 
@@ -185,9 +188,15 @@ async function handleLogout() {
 
 async function checkSession() {
   try {
-    // Browser automatically passes the cookie along with this request
-    const res = await fetch("/auth/me");
-    if (!res.ok) throw new Error("No active session");
+    const res = await fetch("/auth/me", {
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      throw new Error("No active session");
+    }
+
     const user = await res.json();
     setLoggedInState(user);
   } catch {
@@ -196,21 +205,21 @@ async function checkSession() {
 }
 
 function setLoggedInState(user) {
+  if (!user) return;
   currentUser = user;
 
-  // Show Profile section, hide Sign In button
-  const authBtn = document.getElementById("authBtn");
-  const profileContainer = document.getElementById("profileContainer");
-  if (authBtn) authBtn.style.display = "none";
-  if (profileContainer) profileContainer.style.display = "block";
-
-  const displayName = user.email.split("@")[0];
-  if (user.first_name) {
-    displayName = user.last_name
+  let displayName = user.first_name
+    ? user.last_name
       ? `${user.first_name} ${user.last_name}`
-      : user.first_name;
-  }
-  const initial = displayName.charAt(0).toUpperCase();
+      : user.first_name
+    : user.email
+      ? user.email.split("@")[0]
+      : "";
+
+  const initial = (user.first_name || displayName || "")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
   const roleName = user.role === 2 || user.role === "admin" ? "ADMIN" : "USER";
 
   const userAvatar = document.getElementById("userAvatar");
@@ -220,8 +229,17 @@ function setLoggedInState(user) {
 
   if (userAvatar) userAvatar.textContent = initial;
   if (headerUserName) headerUserName.textContent = displayName;
-  if (dropdownEmail) dropdownEmail.textContent = user.email;
-  if (dropdownRoleBadge) dropdownRoleBadge.textContent = roleName;
+  if (dropdownEmail) dropdownEmail.textContent = user.email || "";
+  if (dropdownRoleBadge) {
+    dropdownRoleBadge.textContent = roleName;
+    dropdownRoleBadge.style.display = "inline-block";
+  }
+
+  const authBtn = document.getElementById("authBtn");
+  const profileContainer = document.getElementById("profileContainer");
+
+  if (authBtn) authBtn.style.display = "none";
+  if (profileContainer) profileContainer.style.display = "block";
 }
 
 function setLoggedOutState() {
@@ -229,6 +247,19 @@ function setLoggedOutState() {
 
   const authBtn = document.getElementById("authBtn");
   const profileContainer = document.getElementById("profileContainer");
+  const userAvatar = document.getElementById("userAvatar");
+  const headerUserName = document.getElementById("headerUserName");
+  const dropdownEmail = document.getElementById("dropdownEmail");
+  const dropdownRoleBadge = document.getElementById("dropdownRoleBadge");
+
+  if (userAvatar) userAvatar.textContent = "";
+  if (headerUserName) headerUserName.textContent = "";
+  if (dropdownEmail) dropdownEmail.textContent = "";
+  if (dropdownRoleBadge) {
+    dropdownRoleBadge.textContent = "";
+    dropdownRoleBadge.style.display = "none";
+  }
+
   if (authBtn) authBtn.style.display = "inline-flex";
   if (profileContainer) profileContainer.style.display = "none";
 
@@ -236,19 +267,6 @@ function setLoggedOutState() {
   if (dropdown) dropdown.classList.remove("open");
 }
 
-async function handleLogout() {
-  if (e && e.stopPropagation) e.stopPropagation();
-
-  try {
-    // Calling backend logout tells the server to delete the cookie via response.delete_cookie()
-    await fetch("/auth/logout", { method: "POST" });
-  } catch (err) {
-    console.warn("Backend logout request failed:", err);
-  }
-
-  setLoggedOutState();
-
-  if (typeof resetConversation === "function") {
-    resetConversation();
-  }
-}
+document.addEventListener("DOMContentLoaded", () => {
+  checkSession();
+});
