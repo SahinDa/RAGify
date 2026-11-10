@@ -179,21 +179,18 @@ function resetConversation() {
 }
 
 // --- Query Routing ---
-function submitQuery() {
+async function submitQuery() {
   const input = document.getElementById("questionInput");
-  const q = input.value.trim();
-  if (!q) return;
+  const question = input.value.trim();
+  if (!question) return;
 
-  if (!currentUser) {
-    openAuthModal();
-    return;
-  }
+  const streamToggle = document.getElementById("streamToggle");
+  const isStream = streamToggle ? streamToggle.checked : true;
 
-  const isStream = document.getElementById("streamToggle").checked;
   if (isStream) {
-    streamQuery(q);
+    streamQuery(question);
   } else {
-    standardQuery(q);
+    standardQuery(question);
   }
 }
 
@@ -214,6 +211,7 @@ async function standardQuery(question) {
       {
         method: "POST",
         headers: getAuthHeaders(),
+        credentials: "include",
       },
     );
     const data = await res.json();
@@ -256,6 +254,7 @@ async function streamQuery(question) {
       {
         method: "POST",
         headers: getAuthHeaders(),
+        credentials: "include",
       },
     );
 

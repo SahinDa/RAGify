@@ -1,5 +1,6 @@
 let isLoginMode = true;
 let currentUser = null;
+let isDemoMode = true;
 
 function getAuthHeaders() {
   const token = localStorage.getItem("ragify_token");
@@ -7,10 +8,6 @@ function getAuthHeaders() {
 }
 
 function openAuthModal() {
-  if (currentUser) {
-    handleLogout();
-    return;
-  }
   const errorEl = document.getElementById("authError");
   if (errorEl) errorEl.textContent = "";
 
@@ -23,9 +20,7 @@ function openAuthModal() {
 
 function closeAuthModal() {
   const modal = document.getElementById("authModal");
-  if (modal) {
-    modal.classList.remove("active");
-  }
+  if (modal) modal.classList.remove("active");
 }
 
 function handleOverlayClick(e) {
@@ -119,9 +114,7 @@ async function submitAuth(e) {
     }
 
     payload.first_name = firstName;
-    if (lastName) {
-      payload.last_name = lastName;
-    }
+    if (lastName) payload.last_name = lastName;
   }
 
   btn.disabled = true;
@@ -133,6 +126,7 @@ async function submitAuth(e) {
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(payload),
     });
     const data = await res.json();
@@ -179,11 +173,7 @@ async function handleLogout(e) {
   }
 
   localStorage.removeItem("ragify_token");
-  setLoggedOutState();
-
-  if (typeof resetConversation === "function") {
-    resetConversation();
-  }
+  setDemoModeState();
 }
 
 async function checkSession() {
@@ -194,19 +184,33 @@ async function checkSession() {
     });
 
     if (!res.ok) {
-      throw new Error("No active session");
+      setDemoModeState();
+      return;
     }
 
-    const user = await res.json();
-    setLoggedInState(user);
+    const data = await res.json();
+    if (data.authenticated && data.user) {
+      setLoggedInState(data.user);
+    } else {
+      setDemoModeState();
+    }
   } catch {
-    setLoggedOutState();
+    setDemoModeState();
   }
 }
 
 function setLoggedInState(user) {
   if (!user) return;
   currentUser = user;
+  isDemoMode = false;
+
+  const authBtn = document.getElementById("authBtn");
+  const demoBadge = document.getElementById("demoBadge");
+  const profileContainer = document.getElementById("profileContainer");
+
+  if (demoBadge) demoBadge.style.display = "none";
+  if (authBtn) authBtn.style.display = "none";
+  if (profileContainer) profileContainer.style.display = "block";
 
   let displayName = user.first_name
     ? user.last_name
@@ -214,9 +218,9 @@ function setLoggedInState(user) {
       : user.first_name
     : user.email
       ? user.email.split("@")[0]
-      : "";
+      : "User";
 
-  const initial = (user.first_name || displayName || "")
+  const initial = (user.first_name || displayName || "U")
     .trim()
     .charAt(0)
     .toUpperCase();
@@ -234,18 +238,14 @@ function setLoggedInState(user) {
     dropdownRoleBadge.textContent = roleName;
     dropdownRoleBadge.style.display = "inline-block";
   }
-
-  const authBtn = document.getElementById("authBtn");
-  const profileContainer = document.getElementById("profileContainer");
-
-  if (authBtn) authBtn.style.display = "none";
-  if (profileContainer) profileContainer.style.display = "block";
 }
 
-function setLoggedOutState() {
+function setDemoModeState() {
   currentUser = null;
+  isDemoMode = true;
 
   const authBtn = document.getElementById("authBtn");
+  const demoBadge = document.getElementById("demoBadge");
   const profileContainer = document.getElementById("profileContainer");
   const userAvatar = document.getElementById("userAvatar");
   const headerUserName = document.getElementById("headerUserName");
@@ -260,6 +260,7 @@ function setLoggedOutState() {
     dropdownRoleBadge.style.display = "none";
   }
 
+  if (demoBadge) demoBadge.style.display = "inline-flex";
   if (authBtn) authBtn.style.display = "inline-flex";
   if (profileContainer) profileContainer.style.display = "none";
 
