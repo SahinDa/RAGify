@@ -174,6 +174,10 @@ async function handleLogout(e) {
 
   localStorage.removeItem("ragify_token");
   setDemoModeState();
+
+  if (typeof resetConversation === "function") {
+    resetConversation();
+  }
 }
 
 async function checkSession() {
@@ -189,12 +193,15 @@ async function checkSession() {
     }
 
     const data = await res.json();
-    if (data.authenticated && data.user) {
+    if (data && data.authenticated && data.user) {
+      // User is logged in: swap UI to authenticated state
       setLoggedInState(data.user);
     } else {
+      // Guest/Demo user: keep Demo UI
       setDemoModeState();
     }
-  } catch {
+  } catch (err) {
+    console.error("Session check fallback to demo:", err);
     setDemoModeState();
   }
 }
@@ -208,9 +215,12 @@ function setLoggedInState(user) {
   const demoBadge = document.getElementById("demoBadge");
   const profileContainer = document.getElementById("profileContainer");
 
+  // HIDE demo badge & Sign In button
   if (demoBadge) demoBadge.style.display = "none";
   if (authBtn) authBtn.style.display = "none";
-  if (profileContainer) profileContainer.style.display = "block";
+
+  // SHOW user profile dropdown
+  if (profileContainer) profileContainer.style.display = "inline-flex";
 
   let displayName = user.first_name
     ? user.last_name
@@ -247,21 +257,188 @@ function setDemoModeState() {
   const authBtn = document.getElementById("authBtn");
   const demoBadge = document.getElementById("demoBadge");
   const profileContainer = document.getElementById("profileContainer");
+
+  // SHOW demo badge and Sign In button side-by-side
+  if (demoBadge) demoBadge.style.display = "inline-flex";
+  if (authBtn) authBtn.style.display = "inline-flex";
+
+  // HIDE user profile dropdown
+  if (profileContainer) profileContainer.style.display = "none";
+
+  const dropdown = document.getElementById("profileDropdown");
+  if (dropdown) dropdown.classList.remove("open");
+}
+async function checkSession() {
+  try {
+    const res = await fetch("/auth/me", {
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      setDemoModeState();
+      return;
+    }
+
+    const data = await res.json();
+    if (data && data.authenticated && data.user) {
+      // User is logged in: swap UI to authenticated state
+      setLoggedInState(data.user);
+    } else {
+      // Guest/Demo user: keep Demo UI
+      setDemoModeState();
+    }
+  } catch (err) {
+    console.error("Session check fallback to demo:", err);
+    setDemoModeState();
+  }
+}
+
+function setLoggedInState(user) {
+  if (!user) return;
+  currentUser = user;
+  isDemoMode = false;
+
+  const authBtn = document.getElementById("authBtn");
+  const demoBadge = document.getElementById("demoBadge");
+  const profileContainer = document.getElementById("profileContainer");
+
+  // HIDE demo badge & Sign In button
+  if (demoBadge) demoBadge.style.display = "none";
+  if (authBtn) authBtn.style.display = "none";
+
+  // SHOW user profile dropdown
+  if (profileContainer) profileContainer.style.display = "inline-flex";
+
+  let displayName = user.first_name
+    ? user.last_name
+      ? `${user.first_name} ${user.last_name}`
+      : user.first_name
+    : user.email
+      ? user.email.split("@")[0]
+      : "User";
+
+  const initial = (user.first_name || displayName || "U")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
+  const roleName = user.role === 2 || user.role === "admin" ? "ADMIN" : "USER";
+
   const userAvatar = document.getElementById("userAvatar");
   const headerUserName = document.getElementById("headerUserName");
   const dropdownEmail = document.getElementById("dropdownEmail");
   const dropdownRoleBadge = document.getElementById("dropdownRoleBadge");
 
-  if (userAvatar) userAvatar.textContent = "";
-  if (headerUserName) headerUserName.textContent = "";
-  if (dropdownEmail) dropdownEmail.textContent = "";
+  if (userAvatar) userAvatar.textContent = initial;
+  if (headerUserName) headerUserName.textContent = displayName;
+  if (dropdownEmail) dropdownEmail.textContent = user.email || "";
   if (dropdownRoleBadge) {
-    dropdownRoleBadge.textContent = "";
-    dropdownRoleBadge.style.display = "none";
+    dropdownRoleBadge.textContent = roleName;
+    dropdownRoleBadge.style.display = "inline-block";
   }
+}
 
+function setDemoModeState() {
+  currentUser = null;
+  isDemoMode = true;
+
+  const authBtn = document.getElementById("authBtn");
+  const demoBadge = document.getElementById("demoBadge");
+  const profileContainer = document.getElementById("profileContainer");
+
+  // SHOW demo badge and Sign In button side-by-side
   if (demoBadge) demoBadge.style.display = "inline-flex";
   if (authBtn) authBtn.style.display = "inline-flex";
+
+  // HIDE user profile dropdown
+  if (profileContainer) profileContainer.style.display = "none";
+
+  const dropdown = document.getElementById("profileDropdown");
+  if (dropdown) dropdown.classList.remove("open");
+}
+async function checkSession() {
+  try {
+    const res = await fetch("/auth/me", {
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      setDemoModeState();
+      return;
+    }
+
+    const data = await res.json();
+    if (data && data.authenticated && data.user) {
+      // User is logged in: swap UI to authenticated state
+      setLoggedInState(data.user);
+    } else {
+      // Guest/Demo user: keep Demo UI
+      setDemoModeState();
+    }
+  } catch (err) {
+    console.error("Session check fallback to demo:", err);
+    setDemoModeState();
+  }
+}
+
+function setLoggedInState(user) {
+  if (!user) return;
+  currentUser = user;
+  isDemoMode = false;
+
+  const authBtn = document.getElementById("authBtn");
+  const demoBadge = document.getElementById("demoBadge");
+  const profileContainer = document.getElementById("profileContainer");
+
+  // HIDE demo badge & Sign In button
+  if (demoBadge) demoBadge.style.display = "none";
+  if (authBtn) authBtn.style.display = "none";
+
+  // SHOW user profile dropdown
+  if (profileContainer) profileContainer.style.display = "inline-flex";
+
+  let displayName = user.first_name
+    ? user.last_name
+      ? `${user.first_name} ${user.last_name}`
+      : user.first_name
+    : user.email
+      ? user.email.split("@")[0]
+      : "User";
+
+  const initial = (user.first_name || displayName || "U")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
+  const roleName = user.role === 2 || user.role === "admin" ? "ADMIN" : "USER";
+
+  const userAvatar = document.getElementById("userAvatar");
+  const headerUserName = document.getElementById("headerUserName");
+  const dropdownEmail = document.getElementById("dropdownEmail");
+  const dropdownRoleBadge = document.getElementById("dropdownRoleBadge");
+
+  if (userAvatar) userAvatar.textContent = initial;
+  if (headerUserName) headerUserName.textContent = displayName;
+  if (dropdownEmail) dropdownEmail.textContent = user.email || "";
+  if (dropdownRoleBadge) {
+    dropdownRoleBadge.textContent = roleName;
+    dropdownRoleBadge.style.display = "inline-block";
+  }
+}
+
+function setDemoModeState() {
+  currentUser = null;
+  isDemoMode = true;
+
+  const authBtn = document.getElementById("authBtn");
+  const demoBadge = document.getElementById("demoBadge");
+  const profileContainer = document.getElementById("profileContainer");
+
+  // SHOW demo badge and Sign In button side-by-side
+  if (demoBadge) demoBadge.style.display = "inline-flex";
+  if (authBtn) authBtn.style.display = "inline-flex";
+
+  // HIDE user profile dropdown
   if (profileContainer) profileContainer.style.display = "none";
 
   const dropdown = document.getElementById("profileDropdown");

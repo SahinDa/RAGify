@@ -4,21 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RAGify — Document Intelligence</title>
-
-    <!-- External Markdown Parser & KaTeX Math Rendering -->
+    <title>RAGify - Document Intelligence</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Markdown & KaTeX Math Support -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"
-        onload="renderMathInElement(document.body);"></script>
-
-    <!-- App Stylesheet -->
-    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
 </head>
 
 <body>
-    <!-- Top Bar Navigation -->
+    <!-- Top Bar -->
     <header>
         <div class="brand">
             <div class="brand-icon">⚡</div>
@@ -26,10 +22,20 @@
         </div>
 
         <div class="header-actions">
-            <!-- Sign In Button (Visible when logged out) -->
+            <!-- Mode Badges & Auth Actions -->
+            <div id="demoBadge" class="demo-badge-pill">
+                <span class="badge-pulse">
+                    <span class="badge-pulse-ring"></span>
+                    <span class="badge-dot"></span>
+                </span>
+                <span class="badge-title">Demo Mode</span>
+                <span class="badge-divider"></span>
+                <span class="badge-scope">Public</span>
+            </div>
+
             <button type="button" class="btn-header btn-primary" id="authBtn" onclick="openAuthModal()">Sign In</button>
 
-            <!-- Profile Dropdown Section (Starts hidden; only revealed after auth verification) -->
+            <!-- Profile Dropdown Section (Hidden by default for guests) -->
             <div class="profile-container" id="profileContainer" style="display: none;">
                 <button type="button" class="profile-trigger" id="profileTrigger"
                     onclick="toggleProfileDropdown(event)">
@@ -52,6 +58,7 @@
                 </div>
             </div>
 
+            <!-- Utilities -->
             <button type="button" class="btn-header" onclick="toggleTheme()">
                 <span id="themeIcon">🌙</span>
                 <span id="themeLabel">Dark</span>
@@ -60,16 +67,16 @@
         </div>
     </header>
 
-    <!-- Upload Status Bar -->
+    <!-- Document Upload Bar -->
     <div class="doc-bar">
         <div class="dropzone-pill" id="dropzone" onclick="handleDropzoneClick()">
+            <input type="file" id="fileInput" accept=".pdf,.docx,.txt" onchange="handleSingleFile(this.files[0])">
             <span id="dropzoneIcon">📄</span>
             <span id="dropzoneText">Drop document here or <strong>browse</strong> (.pdf, .docx, .txt)</span>
-            <input type="file" id="fileInput" accept=".txt,.pdf,.docx" onchange="handleSingleFile(this.files[0])" />
         </div>
     </div>
 
-    <!-- Scrollable Chat Canvas -->
+    <!-- Scrollable Chat Workspace -->
     <main id="chat-history">
         <div class="welcome-center" id="welcomeCenter">
             <div class="welcome-icon">💬</div>
@@ -78,79 +85,80 @@
         </div>
     </main>
 
-    <!-- Bottom Query Console -->
+    <!-- Fixed Bottom Console -->
     <footer>
         <div class="console-dock">
             <div class="input-row">
-                <textarea id="questionInput" class="input-box" rows="1"
-                    placeholder="Ask a question across your documents..." oninput="autoResize(this)"
-                    onkeydown="handleKey(event)"></textarea>
+                <textarea id="questionInput" class="input-box" placeholder="Ask a question about your documents..."
+                    rows="1" oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
                 <button type="button" class="btn-send" id="submitBtn" onclick="submitQuery()">Send</button>
             </div>
             <div class="meta-strip">
                 <label class="stream-toggle">
-                    <input type="checkbox" id="streamToggle" checked />
-                    <span>Token Streaming</span>
+                    <input type="checkbox" id="streamToggle" checked>
+                    <span>Stream response</span>
                 </label>
-                <span>Enter to Send, Shift+Enter for newline</span>
+                <span>Press Enter to send, Shift+Enter for newline</span>
             </div>
         </div>
     </footer>
 
-    <!-- Auth Modal Dialog -->
+    <!-- Auth Modal -->
     <div class="modal-overlay" id="authModal" onclick="handleOverlayClick(event)">
-        <div class="auth-card" onclick="event.stopPropagation()">
+        <div class="auth-card">
             <div class="auth-header">
-                <h2 class="auth-title" id="authModalTitle">Sign In</h2>
-                <button type="button" class="btn-close" onclick="closeAuthModal()" aria-label="Close dialog">×</button>
+                <h3 class="auth-title" id="authModalTitle">Sign In</h3>
+                <button type="button" class="btn-close" onclick="closeAuthModal()">✕</button>
             </div>
 
-            <div class="auth-error" id="authError"></div>
+            <div id="authError" class="auth-error"></div>
 
-            <!-- Sign Up Name Fields -->
-            <div id="signupNameFields" style="display: none; gap: 10px; width: 100%; box-sizing: border-box;">
-                <div class="auth-field" style="flex: 1; min-width: 0;">
-                    <label for="authFirstName">First Name</label>
-                    <input class="auth-input" type="text" id="authFirstName" placeholder="John"
-                        onkeydown="handleAuthKey(event)" />
+            <form onsubmit="submitAuth(event)" style="display: flex; flex-direction: column; gap: 12px;">
+                <div id="signupNameFields" style="display: none; gap: 10px;">
+                    <div class="auth-field" style="flex: 1;">
+                        <label for="authFirstName">First Name</label>
+                        <input type="text" id="authFirstName" class="auth-input" autocomplete="given-name"
+                            onkeydown="handleAuthKey(event)">
+                    </div>
+                    <div class="auth-field" style="flex: 1;">
+                        <label for="authLastName">Last Name</label>
+                        <input type="text" id="authLastName" class="auth-input" autocomplete="family-name"
+                            onkeydown="handleAuthKey(event)">
+                    </div>
                 </div>
-                <div class="auth-field" style="flex: 1; min-width: 0;">
-                    <label for="authLastName">Last Name</label>
-                    <input class="auth-input" type="text" id="authLastName" placeholder="Doe"
-                        onkeydown="handleAuthKey(event)" />
+
+                <div class="auth-field">
+                    <label for="authEmail">Email</label>
+                    <input type="email" id="authEmail" class="auth-input" required autocomplete="email"
+                        onkeydown="handleAuthKey(event)">
                 </div>
-            </div>
 
-            <div class="auth-field">
-                <label for="authEmail">Email</label>
-                <input class="auth-input" type="email" id="authEmail" placeholder="you@domain.com"
-                    onkeydown="handleAuthKey(event)" />
-            </div>
+                <div class="auth-field">
+                    <label for="authPassword">Password</label>
+                    <input type="password" id="authPassword" class="auth-input" required autocomplete="current-password"
+                        onkeydown="handleAuthKey(event)">
+                </div>
 
-            <div class="auth-field">
-                <label for="authPassword">Password</label>
-                <input class="auth-input" type="password" id="authPassword" placeholder="••••••••"
-                    onkeydown="handleAuthKey(event)" />
-            </div>
+                <div class="auth-field" id="confirmPasswordField" style="display: none;">
+                    <label for="authConfirmPassword">Confirm Password</label>
+                    <input type="password" id="authConfirmPassword" class="auth-input" autocomplete="new-password"
+                        onkeydown="handleAuthKey(event)">
+                </div>
 
-            <div class="auth-field" id="confirmPasswordField" style="display: none;">
-                <label for="authConfirmPassword">Confirm Password</label>
-                <input class="auth-input" type="password" id="authConfirmPassword" placeholder="••••••••"
-                    onkeydown="handleAuthKey(event)" />
-            </div>
+                <button type="submit" class="btn-send" id="authSubmitBtn" style="margin-top: 6px; width: 100%;">Sign
+                    In</button>
+            </form>
 
-            <button type="button" class="btn-send" id="authSubmitBtn" onclick="submitAuth(event)">Sign In</button>
-
-            <div class="auth-toggle-link" id="authToggleText" onclick="toggleAuthMode()">
-                Don't have an account? Sign Up
+            <div style="text-align: center; margin-top: 6px;">
+                <a href="javascript:void(0)" class="auth-toggle-link" id="authToggleText"
+                    onclick="toggleAuthMode()">Don't have an account? Sign Up</a>
             </div>
         </div>
     </div>
 
-    <!-- Application Scripts with Cache-Busting Version Query -->
-    <script src="/static/js/auth.js?v=2.0"></script>
-    <script src="/static/js/upload.js?v=2.0"></script>
-    <script src="/static/js/chat.js?v=2.0"></script>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/upload.js"></script>
 </body>
 
 </html>
