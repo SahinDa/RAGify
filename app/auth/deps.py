@@ -13,7 +13,7 @@ security = HTTPBearer(auto_error=False)
 
 class DemoUser(BaseModel):
     """Virtual user object representing an unauthenticated guest."""
-    id: str = "demo-guest"
+    id: Optional[str] = None
     email: str = "guest@demo.local"
     first_name: str = "Guest"
     last_name: Optional[str] = None
