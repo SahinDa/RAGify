@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 load_dotenv()
+import asyncpg
 from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
