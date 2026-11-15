@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     yield
     await close_db_pool()
     
-app = FastAPI(title="RAGify")
+app = FastAPI(title="RAGify", lifespan=lifespan)
 
 logger = logging.getLogger(__name__)
 
@@ -176,8 +176,7 @@ async def ask_question(
             is_public=is_public,
             user_id=user_id,
         )
-    except TypeError:
-        chunks = await run_in_threadpool(retrieve_relevant_chunks, search_query)
+        
     except Exception as e:
         logger.error(f"Retrieval failed for question '{question}': {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving relevant chunks: {str(e)}")
@@ -262,8 +261,7 @@ async def ask_question_stream(
             is_public=is_public,
             user_id=user_id,
         )
-    except TypeError:
-        chunks = await run_in_threadpool(retrieve_relevant_chunks, search_query)
+        
     except Exception as e:
         logger.error(f"Retrieval failed for streaming question '{question}': {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving relevant chunks: {str(e)}")

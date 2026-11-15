@@ -233,7 +233,7 @@ def parse_file(filename: str, content: bytes) -> str:
 
         text = ""
         for page in reader.pages:
-            text += page.extract_text() + "\n"
+            text += (page.extract_text() or "") + "\n"
 
 
     elif filename.lower().endswith(".docx"):
@@ -276,3 +276,7 @@ def get_chunk_id(source_filename: str, chunk_index: int,text: str) -> str:
     """
     content_hash = hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
     return f"{source_filename}#chunk_{chunk_index}_{content_hash}"
+
+def compute_file_hash(content: bytes) -> str:
+    """Returns the SHA-256 hex digest of raw uploaded file bytes."""
+    return hashlib.sha256(content).hexdigest()
