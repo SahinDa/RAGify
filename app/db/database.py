@@ -28,3 +28,23 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+async def get_db_pool() -> asyncpg.Pool:
+    """Returns a shared asyncpg connection pool, initializing it lazily."""
+    global _async_pool
+    if _async_pool is None:
+        _async_pool = await asyncpg.create_pool(
+            dsn=DATABASE_URL,
+            min_size=1,
+            max_size=5,
+            command_timeout=30,
+        )
+    return _async_pool
+
+
+async def close_db_pool() -> None:
+    """Closes the shared asyncpg pool cleanly on application shutdown."""
+    global _async_pool
+    if _async_pool is not None:
+        await _async_pool.close()
+        _async_pool = None        

@@ -1,5 +1,6 @@
 import os
 import asyncpg
+from typing import Optional
 import re
 from dotenv import load_dotenv
 
@@ -22,22 +23,111 @@ def build_or_query(question: str) -> str:
         return question  # fallback: don't break if everything got filtered out
     return " | ".join(keywords)
 
-
-async def index_chunks(chunks: list[str], ids: list[str], source_filename: str):
+async def check_duplicate_document(
+    file_hash: str,
+    is_public: bool,
+    user_id: Optional[str],
+) -> Optional[dict]:
     """
-    Inserts chunks into Postgres for full-text search.
+    Checks if a document with the exact SHA-256 file_hash already exists
+    within the caller's ownership scope.
     """
     conn = await asyncpg.connect(DATABASE_URL)
     try:
-        await conn.execute("DELETE FROM chunks WHERE source = $1", source_filename)
-        await conn.executemany(
-            "INSERT INTO chunks (id,text,source) VALUES ($1, $2, $3)",
-            [(cid, text, source_filename) for cid, text in zip(ids,chunks)]
-        )
+        if is_public:
+            row = await conn.fetchrow(
+                """
+                SELECT id::text AS document_id, filename, chunk_count
+                FROM documents
+                WHERE is_public = TRUE AND file_hash = $1
+                LIMIT 1
+                """,
+                file_hash,
+            )
+        else:
+            row = await conn.fetchrow(
+                """
+                SELECT id::text AS document_id, filename, chunk_count
+                FROM documents
+                WHERE is_public = FALSE AND user_id = $1 AND file_hash = $2
+                LIMIT 1
+                """,
+                user_id,
+                file_hash,
+            )
+        return dict(row) if row else None
     finally:
-        await conn.close()    
+        await conn.close()
+   
         
+async def index_document_and_chunks(
+    document_id: str,
+    filename: str,
+    file_hash: str,
+    chunks: list[str],
+    ids: list[str],
+    is_public: bool,
+    user_id: Optional[str],
+) -> list[str]:
+    """
+    Atomically replaces any prior version of the same filename within the same
+    ownership scope, inserts the new parent `documents` record, and bulk-inserts
+    all child `chunks` with ownership flags.
+    Returns any superseded document_ids so caller can purge stale ChromaDB vectors.
+    """
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        async with conn.transaction():
+            # Remove prior versions of the same filename in the same scope
+            if is_public:
+                old_rows = await conn.fetch(
+                    """
+                    DELETE FROM documents
+                    WHERE is_public = TRUE AND filename = $1
+                    RETURNING id::text AS id
+                    """,
+                    filename,
+                )
+            else:
+                old_rows = await conn.fetch(
+                    """
+                    DELETE FROM documents
+                    WHERE is_public = FALSE AND user_id = $1 AND filename = $2
+                    RETURNING id::text AS id
+                    """,
+                    user_id,
+                    filename,
+                )
 
+            stale_doc_ids = [r["id"] for r in old_rows]
+
+            await conn.execute(
+                """
+                INSERT INTO documents (id, filename, file_hash, is_public, user_id, chunk_count)
+                VALUES ($1::uuid, $2, $3, $4, $5, $6)
+                """,
+                document_id,
+                filename,
+                file_hash,
+                is_public,
+                user_id,
+                len(chunks),
+            )
+
+            await conn.executemany(
+                """
+                INSERT INTO chunks (id, document_id, chunk_index, text, source, is_public, user_id)
+                VALUES ($1, $2::uuid, $3, $4, $5, $6, $7)
+                """,
+                [
+                    (cid, document_id, idx, text, filename, is_public, user_id)
+                    for idx, (cid, text) in enumerate(zip(ids, chunks))
+                ],
+            )
+
+            return stale_doc_ids
+    finally:
+        await conn.close()
 
 
 async def keyword_search(question: str,top_k: int = 20) -> list[str]:
