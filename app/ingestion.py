@@ -3,12 +3,15 @@ import os
 from app.services import embedder
 from pypdf import PdfReader
 import io
+import uuid
 import hashlib
 import docx
 import re
-from app.postgres_search import index_chunks
+from app.postgres_search import index_document_and_chunks
 import asyncio
 from dotenv import load_dotenv
+from typing import Optional
+from fastapi.concurrency import run_in_threadpool
 import logging
 logger = logging.getLogger(__name__)
 
@@ -129,41 +132,85 @@ def embed_chunks(chunks: list[str]) -> list[list[float]]:
     logger.info(f"Embedded {len(chunks)} chunks")
     return embeddings 
 
-def store_chunks(chunks: list[str], embeddings: list[list[float]], source_filename: str):
+def _upsert_chroma_chunks(
+    document_id: str,
+    chunks: list[str],
+    embeddings: list[list[float]],
+    source_filename: str,
+    is_public: bool,
+    user_id: Optional[str],
+    stale_doc_ids: list[str],
+) -> None:
     """
-    Stores chunks + embeddings + metadata into ChromaDB.
-    - Deletes old chunks tied to this exact filename first (handles edited re-uploads,
-      so stale/removed content doesn't linger forever).
-    - Uses content-hash IDs so identical text is never duplicated,
-      even if it appears under a different filename.
+    Synchronous helper (run via run_in_threadpool) that purges any superseded
+    document vectors and upserts the new UUID-anchored chunks into ChromaDB.
     """
-    
-    # Step 1: clear out old chunks from this filename (in case the file was edited)
-    collection.delete(where={"source": source_filename})
+    for old_doc_id in stale_doc_ids:
+        collection.delete(where={"document_id": old_doc_id})
 
-    # 2. Generate collision-safe compound IDs
-    ids = [get_chunk_id(source_filename, i, chunk) for i, chunk in enumerate(chunks)]
+    ids = [f"{document_id}:{i}" for i in range(len(chunks))]
     metadatas = [
-        {"source": source_filename, "chunk_index": i, "char_length": len(chunks[i])}
+        {
+            "document_id": document_id,
+            "source": source_filename,
+            "chunk_index": i,
+            "char_length": len(chunks[i]),
+            "is_public": is_public,
+            "user_id": user_id or "",
+        }
         for i in range(len(chunks))
     ]
-    
-    # Step 3: upsert - overwrites if identical content already exists under any ID
+
     collection.upsert(
         ids=ids,
         embeddings=embeddings,
         documents=chunks,
-        metadatas=metadatas
+        metadatas=metadatas,
     )
+    logger.info(f"Stored {len(chunks)} chunks in ChromaDB for doc {document_id} ({source_filename})")
     
-    logger.info(f"Stored {len(chunks)} chunks in ChromaDB for {source_filename}")
-    try:
-        asyncio.run(index_chunks(chunks,ids,source_filename))
-        logger.info(f"Stored {len(chunks)} chunks in Postgres for {source_filename}")
-    except Exception as e :
-        logger.error(f"Failed to index chunks into Postgres for {source_filename}: {e}")
-        raise
-            
+async def store_chunks(
+    chunks: list[str],
+    embeddings: list[list[float]],
+    source_filename: str,
+    file_hash: str,
+    is_public: bool,
+    user_id: Optional[str],
+) -> str:
+    """
+    Generates a UUID document_id, persists the parent document + child chunks in
+    PostgreSQL, and upserts the vectors + ownership metadata into ChromaDB.
+    Returns the created document_id.
+    """
+    
+    document_id = str(uuid.uuid4())
+    ids = []
+    for index, chunk in enumerate(chunks):
+        ids.append(f"{document_id}:{index}")
+
+    stale_doc_ids = await index_document_and_chunks(
+        document_id=document_id,
+        filename=source_filename,
+        file_hash=file_hash,
+        chunks=chunks,
+        ids=ids,
+        is_public=is_public,
+        user_id=user_id,
+    )
+    logger.info(f"Stored {len(chunks)} chunks in Postgres for doc {document_id} ({source_filename})")
+
+    await run_in_threadpool(
+        _upsert_chroma_chunks,
+        document_id,
+        chunks,
+        embeddings,
+        source_filename,
+        is_public,
+        user_id,
+        stale_doc_ids,
+    )
+
+    return document_id
     
 
 def parse_file(filename: str, content: bytes) -> str:
