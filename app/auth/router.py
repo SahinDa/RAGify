@@ -123,15 +123,15 @@ def logout(response: Response, current_user: User = Depends(get_current_user)):
 @router.get("/me")
 def get_me(user=Depends(get_current_user_or_guest)):
     """Retrieve details for active user session; returns DemoUser directly for guests."""
-    if isinstance(user, DemoUser) or getattr(user, "is_demo", False):
+    if isinstance(user, DemoUser) or getattr(user, "is_public", False):
         return {
             "authenticated": False,
-            "is_demo": True,
+            "is_public": True,
             "user": user,
         }
 
     return {
         "authenticated": True,
-        "is_demo": False,
+        "is_public": False,
         "user": UserResponse.model_validate(user),
     }

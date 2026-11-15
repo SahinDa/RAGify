@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional,Tuple, Union
 from pydantic import BaseModel, Field
 from fastapi import Depends, Request, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -18,7 +18,7 @@ class DemoUser(BaseModel):
     first_name: str = "Guest"
     last_name: Optional[str] = None
     role: int = Field(default_factory=lambda: int(UserRole.USER))
-    is_demo: bool = True
+    is_public: bool = True
 
 
 def get_optional_user(
@@ -53,7 +53,7 @@ def get_current_user(
     user: Union[User, DemoUser] = Depends(get_optional_user),
 ) -> User:
     """Strict check: raises 401 if the user is a Demo / Guest."""
-    if isinstance(user, DemoUser) or getattr(user, "is_demo", False):
+    if isinstance(user, DemoUser) or getattr(user, "is_public", False):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required. Please sign in or create an account.",
@@ -61,6 +61,15 @@ def get_current_user(
         )
     return user
 
+def resolve_ownership(user: Union[User, DemoUser]) -> Tuple[bool, Optional[str]]:
+    """
+    Maps User or DemoUser to (is_public, user_id):
+    - DemoUser -> (True, None)
+    - User     -> (False, str(user.id))
+    """
+    if isinstance(user, DemoUser) or getattr(user, "is_public", False):
+        return True, None
+    return False, str(user.id)
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """Enforces that the authenticated user possesses admin privileges."""
