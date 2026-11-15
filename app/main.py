@@ -18,16 +18,24 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 # Ingestion, Retrieval & LLM Pipeline
-from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks
+from app.ingestion import parse_file, chunk_text, embed_chunks, store_chunks, compute_file_hash
 from app.retrieval import retrieve_relevant_chunks
 from app.llm import build_prompt, call_llm_stream, contextualize_query
 from app.memory import conversation_memory
-from app.summarizer import trigger_summarization_if_needed
+from contextlib import asynccontextmanager
+from app.db.database import close_db_pool
+from app.summarizer import trigger_summarization_if_needed 
+from app.postgres_search import check_duplicate_document
+from app.auth import auth_router, get_optional_user, resolve_ownership
 
 # Database Models & Auth Module
 from app.db.models import User
-from app.auth import auth_router, get_optional_user
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await close_db_pool()
+    
 app = FastAPI(title="RAGify")
 
 logger = logging.getLogger(__name__)
@@ -70,9 +78,13 @@ async def upload_file(
 ):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided.")
-
+    
+    is_public, user_id = resolve_ownership(current_user)
     content = await file.read()
-    logger.info(f"Upload received: {file.filename} ({len(content)} bytes) by {current_user.email}")
+    logger.info(
+        f"Upload received: {file.filename} ({len(content)} bytes) by {current_user.email} "
+        f"(is_public={is_public}, user_id={user_id})"
+    )
 
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
@@ -81,9 +93,26 @@ async def upload_file(
     if len(content) > max_size:
         logger.warning(f"Upload rejected (too large): {file.filename} ({len(content)} bytes)")
         raise HTTPException(status_code=413, detail="File too large. Max size is 10MB.")
-
+    
+    # 1. Short-circuit identical file uploads in the same ownership scope
+    file_hash = compute_file_hash(content)
+    existing = await check_duplicate_document(
+        file_hash=file_hash,
+        is_public=is_public,
+        user_id=user_id,
+    )
+    if existing:
+        logger.info(f"Duplicate upload skipped: {file.filename} (doc {existing['document_id']})")
+        return {
+            "document_id": existing["document_id"],
+            "filename": existing["filename"],
+            "chunks_created": existing["chunk_count"],
+            "status": "duplicate",
+            "owner": current_user.email,
+        }
+        
     try:
-        text = parse_file(file.filename, content)
+        text = await run_in_threadpool(parse_file, file.filename, content)
     except ValueError as e:
         logger.error(f"Parse failed for {file.filename}: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -95,21 +124,27 @@ async def upload_file(
     chunks = chunk_text(text)
     embeddings = await run_in_threadpool(embed_chunks, chunks)
 
-    await run_in_threadpool(
-        store_chunks,
-        chunks,
-        embeddings,
+    # 2. Await async store_chunks directly (do NOT wrap in run_in_threadpool)
+    document_id = await store_chunks(
+        chunks=chunks,
+        embeddings=embeddings,
         source_filename=file.filename,
-        user_id=str(current_user.id)
+        file_hash=file_hash,
+        is_public=is_public,
+        user_id=user_id,
     )
 
-    logger.info(f"Upload complete: {file.filename} — {len(chunks)} chunks created for user {current_user.id}")
-
+    logger.info(
+        f"Upload complete: {file.filename} (doc {document_id}) — "
+        f"{len(chunks)} chunks created (is_public={is_public}, user_id={user_id})"
+    )
+    
     return {
+        "document_id": document_id,
         "filename": file.filename,
         "chunks_created": len(chunks),
         "status": "success",
-        "owner": current_user.email
+        "owner": current_user.email,
     }
 
 
@@ -134,12 +169,12 @@ async def ask_question(
         summary=context["summary"]
     )
     logger.info(f"Resolved search query: '{search_query}' (Original: '{question}')")
-
+    is_public, user_id = resolve_ownership(current_user)
     try:
-        chunks = await run_in_threadpool(
-            retrieve_relevant_chunks,
-            search_query,
-            user_id=str(current_user.id)
+        chunks = await retrieve_relevant_chunks(
+            question=search_query,
+            is_public=is_public,
+            user_id=user_id,
         )
     except TypeError:
         chunks = await run_in_threadpool(retrieve_relevant_chunks, search_query)
@@ -219,12 +254,13 @@ async def ask_question_stream(
         recent_turns=context["recent_turns"],
         summary=context["summary"]
     )
-
+    
+    is_public, user_id = resolve_ownership(current_user)
     try:
-        chunks = await run_in_threadpool(
-            retrieve_relevant_chunks,
-            search_query,
-            user_id=str(current_user.id)
+        chunks = await retrieve_relevant_chunks(
+            question=search_query,
+            is_public=is_public,
+            user_id=user_id,
         )
     except TypeError:
         chunks = await run_in_threadpool(retrieve_relevant_chunks, search_query)
