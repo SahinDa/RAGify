@@ -28,7 +28,7 @@ slowapi
 
 # Database: ORM for models/queries and PostgreSQL binary driver
 sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.9
+psycopg[binary]>=3.2.0
 
 # Security & Auth
 passlib[bcrypt]>=1.7.4
