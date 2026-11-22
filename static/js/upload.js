@@ -3,10 +3,6 @@ const dropzoneIcon = document.getElementById("dropzoneIcon");
 const dropzoneText = document.getElementById("dropzoneText");
 
 function handleDropzoneClick() {
-  if (!currentUser) {
-    openAuthModal();
-    return;
-  }
   document.getElementById("fileInput").click();
 }
 
@@ -28,10 +24,6 @@ if (dropzone) {
   dropzone.addEventListener("drop", (e) => {
     e.preventDefault();
     dropzone.classList.remove("dragover");
-    if (!currentUser) {
-      openAuthModal();
-      return;
-    }
     if (e.dataTransfer.files.length) {
       handleSingleFile(e.dataTransfer.files[0]);
     }
@@ -40,11 +32,6 @@ if (dropzone) {
 
 async function handleSingleFile(file) {
   if (!file) return;
-
-  if (!currentUser) {
-    openAuthModal();
-    return;
-  }
 
   dropzone.classList.remove("success");
   dropzoneIcon.textContent = "⚡";
