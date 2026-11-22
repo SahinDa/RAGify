@@ -8,6 +8,8 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 # Read directly from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
+ASYNCPG_URL = DATABASE_URL.replace("postgresql+psycopg://", "postgresql://")
+_async_pool: asyncpg.Pool | None = None
 
 engine = create_engine(
     DATABASE_URL,
@@ -39,6 +41,7 @@ async def get_db_pool() -> asyncpg.Pool:
             min_size=1,
             max_size=5,
             command_timeout=30,
+            statement_cache_size=0,
         )
     return _async_pool
 
