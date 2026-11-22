@@ -1,5 +1,7 @@
 from app.ingestion import collection
 from typing import Optional
+import time
+import httpx
 from fastapi.concurrency import run_in_threadpool
 from app.postgres_search import keyword_search
 from app.services import embedder, reranker
@@ -27,11 +29,19 @@ def _vector_search_sync(
     """Synchronous ChromaDB vector search helper executed in a worker thread."""
     question_embedding = [embedder.embed_query(question)]
 
-    results = collection.query(
-        query_embeddings=question_embedding,
-        n_results=candidate_k,
-        where=where_filter,
-    )
+    results = None
+    for attempt in range(3):
+        try:
+            results = collection.query(
+                query_embeddings=question_embedding,
+                n_results=candidate_k,
+                where=where_filter,
+            )
+            break
+        except (httpx.RemoteProtocolError, httpx.ConnectError, httpx.ReadTimeout):
+            if attempt == 2:
+                raise
+            time.sleep(0.5 * (attempt + 1))
 
     documents = results["documents"][0] if results["documents"] else []
     distances = results["distances"][0] if results["distances"] else []
