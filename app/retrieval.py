@@ -52,9 +52,10 @@ async def retrieve_relevant_chunks(
     question: str,
     is_public: bool,
     user_id: Optional[str],
-    top_k: int = 3,
+    top_k: int = 5,
     candidate_k: int = 20,
     similarity_threshold: float = 0.3,
+    rerank_threshold: float = -1.5,
 ):
     """
     Tenant-isolated hybrid retrieval pipeline:
@@ -107,9 +108,13 @@ async def retrieve_relevant_chunks(
 
     # Stage 4: Re-rank
     candidates = [chunk_lookup[cid] for cid in fused_ids if cid in chunk_lookup]
-    final_results = await run_in_threadpool(reranker.rerank, question, candidates, top_k)
+    reranked = await run_in_threadpool(reranker.rerank, question, candidates, top_k)
+    final_results = [
+        item for item in reranked
+        if item.get("score", 0.0) >= rerank_threshold
+    ]
 
-    logger.info(f"Returning top {len(final_results)} after re-ranking")
+    logger.info(f"Returning {len(final_results)}/{len(reranked)} above rerank_threshold={rerank_threshold}")
     return final_results
 
 def reciprocal_rank_fusion(vector_ids: list[str], keyword_ids: list[str], k: int = 60) -> list[str]:
