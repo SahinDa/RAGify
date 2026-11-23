@@ -6,6 +6,7 @@ CREATE TABLE users (
     last_name VARCHAR(100),
     hashed_password VARCHAR(255) NOT NULL,
     role INTEGER DEFAULT 1 NOT NULL CHECK (role IN (1, 2)),
+    is_verified BOOLEAN DEFAULT FALSE NOT NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
@@ -50,3 +51,12 @@ CREATE INDEX idx_chunks_document_id ON chunks(document_id);
 CREATE INDEX idx_chunks_user_id ON chunks(user_id);
 CREATE INDEX idx_chunks_is_public ON chunks(is_public);
 CREATE INDEX idx_search_vector ON chunks USING GIN(search_vector);
+
+-- 4. Email OTPs Table (Single-active-OTP per email)
+CREATE TABLE email_otps (
+    email VARCHAR(255) PRIMARY KEY,
+    otp_hash VARCHAR(64) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    attempts INT DEFAULT 0 NOT NULL,
+    last_sent_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
