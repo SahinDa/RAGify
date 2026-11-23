@@ -1,62 +1,702 @@
 [
-    {
-      "question": "What is the Transformer architecture based on?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "attention"
-    },
-    {
-      "question": "Does the Transformer use recurrence or convolutions?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "eschewing recurrence"
-    },
-    {
-      "question": "What are the two sub-layers in each encoder layer?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "multi-head self-attention"
-    },
-    {
-      "question": "How many layers are in the encoder stack?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "6 identical layers"
-    },
-    {
-      "question": "What is the dimensionality of the model, d_model, used in the base Transformer?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "512"
-    },
-    {
-      "question": "How many attention heads are used in the multi-head attention mechanism?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "8"
-    },
-    {
-      "question": "What type of positional encoding does the Transformer use?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "sine and cosine"
-    },
-    {
-      "question": "What optimizer was used to train the Transformer?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "Adam"
-    },
-    {
-      "question": "What regularization technique is applied during training, aside from dropout?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "label smoothing"
-    },
-    {
-      "question": "On which two machine translation tasks was the Transformer evaluated?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "English-to-German"
-    },
-    {
-      "question": "What is the formula used to compute scaled dot-product attention?",
-      "expected_source": "NIPS-2017-attention-is-all-you-need-Paper.pdf",
-      "expected_keyword": "softmax"
-    },
-    {
-      "question": "What is the capital of France?",
-      "expected_source": "NO_ANSWER_EXPECTED",
-      "expected_keyword": "NONE"
-    }
-  ]
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What is the Transformer architecture based on?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "attention"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "Does the Transformer use recurrence or convolutions?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "eschewing recurrence"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What are the two sub-layers in each encoder layer of the Transformer?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "multi-head self-attention"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How many identical layers are in the Transformer encoder stack?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "6 identical layers"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How many identical layers are in the Transformer decoder stack?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "6 identical layers"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What third sub-layer does each decoder layer insert in addition to the two encoder sub-layers?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "output of the encoder stack"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What is the dimensionality of the model, d_model, used in the base Transformer?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "512"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What is the inner-layer dimensionality d_ff of the position-wise feed-forward network in the base Transformer?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "2048"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How many parallel attention heads h are used in the base Transformer?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "8"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What is the dimension of keys d_k and values d_v per head in the base Transformer?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "64"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "Why are dot products scaled by 1 over the square root of d_k in Scaled Dot-Product Attention?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "softmax"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What two most commonly used attention functions are compared in the Transformer paper?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "additive attention"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How is the self-attention sub-layer in the decoder modified to preserve the auto-regressive property?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "masking"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What type of functions are used for positional encodings in the Transformer?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "sine and cosine"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What optimizer and beta parameters were used to train the Transformer?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "Adam optimizer"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How many warmup steps were used in the Transformer learning rate schedule?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "4000"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What dropout rate P_drop was used in the base Transformer model?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "0.1"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What label smoothing value epsilon_ls was employed during Transformer training?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "label smoothing"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "On which two WMT 2014 machine translation tasks was the Transformer evaluated?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "English-to-German"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What BLEU score did the big Transformer model achieve on the WMT 2014 English-to-German test set?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "28.4"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What BLEU score did the big Transformer model achieve on the WMT 2014 English-to-French test set?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "41.8"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How many NVIDIA P100 GPUs were used to train the Transformer models?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "8 NVIDIA P100"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How many training steps and days did the base Transformer model take to train?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "100,000 steps"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What vocabulary size was used with byte-pair encoding on the WMT 2014 English-German dataset?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "37000"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What other NLP task besides machine translation was the Transformer evaluated on to test generalization?",
+    "expected_source": "1706.03762v7.pdf",
+    "expected_keyword": "English constituency parsing"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What does the acronym BERT stand for?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "Bidirectional Encoder Representations"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What are the two steps in the BERT framework?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "pre-training and fine-tuning"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How many layers L, hidden size H, and self-attention heads A does BERT_BASE have?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "110M"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How many layers L, hidden size H, and self-attention heads A does BERT_LARGE have?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "340M"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What tokenization method and vocabulary size does BERT use?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "WordPiece"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What special token is always the first token of every input sequence in BERT?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "[CLS]"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What special token separates sentence pairs in BERT input representations?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "[SEP]"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What three embeddings are summed to construct the input representation for a given token in BERT?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "segment"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What are the two unsupervised prediction tasks used to pre-train BERT?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "Masked LM"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What percentage of WordPiece tokens are masked at random during BERT pre-training?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "15%"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "In BERT's masking procedure, how are the chosen 15% of tokens replaced 80%, 10%, and 10% of the time?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "[MASK]"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "In BERT's Next Sentence Prediction task, what percentage of training pairs have IsNext vs NotNext labels?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "50%"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "Which two corpora were used to pre-train BERT, and how many words do they contain in total?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "BooksCorpus"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What batch size, sequence length, and number of training steps were used to pre-train BERT?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "1,000,000 steps"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What activation function does BERT use instead of standard ReLU?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "gelu"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How many Cloud TPUs were used to train BERT_BASE and BERT_LARGE, and for how many days?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "4 days"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What GLUE score did BERT_LARGE achieve, and by how much did it improve over prior state of the art?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "80.5"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What F1 score did BERT_LARGE achieve on SQuAD v1.1?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "93.2"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What F1 score did BERT_LARGE achieve on SQuAD v2.0?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "83.1"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What test accuracy did BERT_LARGE achieve on the SWAG dataset?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "86.3"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How does BERT split sequence lengths between the first 90% and final 10% of pre-training steps?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "512"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What happens in BERT's ablation study when Next Sentence Prediction is removed (No NSP)?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "QNLI"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What happens when BERT uses a left-to-right (LTR) model instead of bidirectional masked LM?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "MRPC"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "In the feature-based approach on CoNLL-2003 NER, which layer representation of BERT_BASE performed best?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "top four hidden layers"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What learning rates were selected during BERT fine-tuning across downstream tasks?",
+    "expected_source": "1810.04805v2.pdf",
+    "expected_keyword": "5e-5"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "How many Atari 2600 games was the DQN agent evaluated on?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "seven"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What size replay memory buffer was used in the DQN experiments?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "one million"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What are the raw input dimensions and color format of an Atari 2600 frame before preprocessing?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "210"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "How are raw Atari frames preprocessed and stacked before being fed into the DQN convolutional network?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "84"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What two key techniques stabilize Q-learning with deep neural networks in DQN?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "experience replay"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What is the exact architecture of the first hidden convolutional layer in DQN?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "stride 4"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What is the exact architecture of the second hidden convolutional layer in DQN?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "stride 2"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "How many rectifier units are in the fully connected hidden layer of DQN?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "256"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "How are positive and negative rewards clipped during DQN training?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "positive rewards to be 1"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What optimization algorithm and minibatch size were used to train DQN?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "RMSProp"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "How does the epsilon-greedy behavior policy anneal epsilon during DQN training?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "0.1"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "How many total frames was DQN trained for on each Atari game?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "10 million"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What frame-skipping value k was used across all games except Space Invaders?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "Space Invaders"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "List the seven Atari 2600 games used to evaluate DQN.",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "Breakout"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "On which three Atari games did DQN surpass a human expert player?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "Enduro"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "On which six of the seven Atari games did DQN outperform all previous reinforcement learning methods?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "Q*bert"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What discount factor gamma is used in the discounted return and Bellman equation in DQN?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "Bellman"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What evaluation metric did the authors track during training because total episode reward is very noisy?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "predicted Q"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What environment emulator was used to run the Atari 2600 games in the DQN paper?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "Arcade Learning Environment"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What value of epsilon was used in Table 1 when evaluating the trained DQN agent?",
+    "expected_source": "1312.5602v1.pdf",
+    "expected_keyword": "0.05"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What are the two premises on which Talcott Parsons's solution to the Hobbesian problem of order rests?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "Normative consensus"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "Who is the author of the paper 'Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology'?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "Thomas Burger"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "According to Thomas Burger, why are Parsons's two premises criticized?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "nonfalsifiable"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What fallacy defined by Whitehead does Parsons invoke against empiricism?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "Fallacy of Misplaced Concreteness"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What question does Parsons declare the Hobbesian solution to the problem of order cannot answer?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "Who guards the guards"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What untenable assumption does Parsons argue Locke's theory of peaceful exchange relies on?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "natural identity"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What are the two separate tenets on which the plausibility of Parsons's normative solution rests?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "moral authority"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "Which two authors voiced criticisms of Parsons's view of socialization through internalization of norms?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "Cancian"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What kind of comprehensive sociology does Parsons reject in favor of a plurality of special social sciences?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "encyclopaedic sociology"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What methodological view, first intimated by Pareto, does Parsons adopt against empiricism?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "analytical factor view"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "How does Burger compare Parsons's analytical factor view to Carl Menger's position in the Methodenstreit?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "Methodenstreit"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What fallacy coined by Karl Polanyi does Burger invoke against the assumption of a natural link between action and social function?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "economistic fallacy"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "In what 1956 book co-authored with Neil Smelser did Parsons change his view of economics from an analytical system to a differentiated subsystem?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "Economy and Society"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What differentiated social subsystem did Parsons later assign to sociology as its special domain?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "societal community"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What cybernetic concept does Parsons use to claim that systems high in norms control systems high in energy?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "cybernetic hierarchy"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "Which sociological treatment of anomie does Parsons cite to argue that without common values there can be no society?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "Durkheim"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "How does Parsons define empiricism in his 1935 essay on sociological elements in economic thought?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "concrete reality"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What does Parsons call his metaphysical conviction that the division of social sciences requires coherent analysis of the whole?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "ultimate concrete unity"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "Why does Burger argue that an analytical economics or sociology based on unexamined behavioral assumptions is unscientific?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "unfalsifiable"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What alternative does Burger conclude sociologists face regarding the problem of order and Parsonian analytic sociology?",
+    "expected_source": "Talcott Parsons, the Problem of Order in Society, and the Program of an Analytical Sociology.pdf",
+    "expected_keyword": "abandon analytic sociology"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What is the capital city of France?",
+    "expected_source": "NO_ANSWER_EXPECTED",
+    "expected_keyword": "NONE"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What is the boiling point of water at standard atmospheric pressure?",
+    "expected_source": "NO_ANSWER_EXPECTED",
+    "expected_keyword": "NONE"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "How many Atari 2600 games was the DQN agent evaluated on?",
+    "expected_source": "NO_ANSWER_EXPECTED",
+    "expected_keyword": "NONE"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What size replay memory buffer was used in the DQN experiments?",
+    "expected_source": "NO_ANSWER_EXPECTED",
+    "expected_keyword": "NONE"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What are the two premises on which Talcott Parsons's solution to the Hobbesian problem of order rests?",
+    "expected_source": "NO_ANSWER_EXPECTED",
+    "expected_keyword": "NONE"
+  },
+  {
+    "scope": "public",
+    "owner": null,
+    "question": "What fallacy defined by Whitehead does Parsons invoke against empiricism?",
+    "expected_source": "NO_ANSWER_EXPECTED",
+    "expected_keyword": "NONE"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What are the two premises on which Talcott Parsons's solution to the Hobbesian problem of order rests?",
+    "expected_source": "NO_ANSWER_EXPECTED",
+    "expected_keyword": "NONE"
+  },
+  {
+    "scope": "private",
+    "owner": "user_a",
+    "question": "What differentiated social subsystem did Parsons later assign to sociology as its special domain?",
+    "expected_source": "NO_ANSWER_EXPECTED",
+    "expected_keyword": "NONE"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "How many Atari 2600 games was the DQN agent evaluated on?",
+    "expected_source": "NO_ANSWER_EXPECTED",
+    "expected_keyword": "NONE"
+  },
+  {
+    "scope": "private",
+    "owner": "user_b",
+    "question": "What size replay memory buffer was used in the DQN experiments?",
+    "expected_source": "NO_ANSWER_EXPECTED",
+    "expected_keyword": "NONE"
+  }
+]
